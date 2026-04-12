@@ -34,11 +34,21 @@ model User {
   children           User[]           @relation("ParentChild")
   subscriptionTier   SubscriptionTier @default(FREE)
   subscriptionEnd    DateTime?
+  // Sprint 4: Hedef okul motoru
+  targetSchoolId     String?
+  targetSchool       School?          @relation(fields: [targetSchoolId], references: [id])
+  dailyStudyMins     Int              @default(60)
+  estimatedReadyDate DateTime?
+  // Sprint 6: Streak
+  currentStreak      Int              @default(0)
+  longestStreak      Int              @default(0)
+  lastStudyDate      DateTime?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   attempts           Attempt[]
   masteries          Mastery[]
   studyPlans         StudyPlan[]
+  mockExams          MockExam[]
 
   @@map("users")
 }
@@ -63,11 +73,14 @@ model Topic {
   isim            String
   mufredatYili    Int        @default(2026)
   kazanimlar      String[]
-  onkosuller      String[]   // topic id'leri
+  onkosuller      String[]
   zorlukKolay     Float      @default(0.33)
   zorlukOrta      Float      @default(0.34)
   zorlukZor       Float      @default(0.33)
   tarihselAgirlik Float      @default(0)
+  // Sprint 3: Icerik
+  videoUrl        String?
+  dersIcerigi     String?    // AI veya manuel metin icerik
   questions       Question[]
   masteries       Mastery[]
 
@@ -119,18 +132,28 @@ enum AttemptBaglam {
   MOCK_EXAM
 }
 
+enum HataKategorisi {
+  DIKKATSIZLIK
+  KAVRAM_EKSIK
+  KONU_ATLAMA
+  ZAMAN_BASKISI
+  BILINMIYOR
+}
+
 // EVENT tablosu — satir asla guncellenmez!
 model Attempt {
-  id         String        @id @default(uuid())
-  userId     String
-  user       User          @relation(fields: [userId], references: [id])
-  questionId String
-  question   Question      @relation(fields: [questionId], references: [id])
-  secilenSik Int
-  dogruMu    Boolean
-  sureMs     Int
-  tarih      DateTime      @default(now())
-  baglam     AttemptBaglam
+  id             String          @id @default(uuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id])
+  questionId     String
+  question       Question        @relation(fields: [questionId], references: [id])
+  secilenSik     Int
+  dogruMu        Boolean
+  sureMs         Int
+  tarih          DateTime        @default(now())
+  baglam         AttemptBaglam
+  // Sprint 6: Neden yanlis siniflandirmasi
+  hataKategorisi HataKategorisi?
 
   @@index([userId, tarih])
   @@index([userId, questionId])
@@ -180,10 +203,48 @@ model DailySession {
   studyPlan      StudyPlan    @relation(fields: [studyPlanId], references: [id])
   tarih          DateTime
   hedefTopicIds  String[]
-  tahminiSure    Int          // dakika
+  tahminiSure    Int
   durum          SessionDurum @default(PENDING)
   attemptIds     String[]
 
   @@index([studyPlanId, tarih])
   @@map("daily_sessions")
+}
+
+// ==================== HEDEF OKUL CONTEXT (Sprint 4) ====================
+
+model School {
+  id        String   @id @default(uuid())
+  isim      String
+  sehir     String
+  ilce      String?
+  minPuan   Float    // taban puan
+  tur       String   @default("Anadolu Lisesi") // Fen, Anadolu, Sosyal Bilimler
+  createdAt DateTime @default(now())
+  users     User[]
+
+  @@index([sehir])
+  @@index([minPuan])
+  @@map("schools")
+}
+
+// ==================== DENEME SINAVI CONTEXT (Sprint 6) ====================
+
+model MockExam {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  baslamaTarihi DateTime @default(now())
+  bitisTarihi   DateTime?
+  toplamSoru    Int
+  dogruSayisi   Int      @default(0)
+  yanlisSayisi  Int      @default(0)
+  bosSayisi     Int      @default(0)
+  netPuan       Float    @default(0)
+  stressModu    Boolean  @default(false)
+  kocYorumu     String?  // AI analizi
+  attemptIds    String[] // iliskili attempt id'leri
+
+  @@index([userId])
+  @@map("mock_exams")
 }

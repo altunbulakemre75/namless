@@ -1,9 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
+
+interface DiagnosticResult {
+  cevaplar: Array<{
+    questionId: string;
+    secilenSik: number;
+    dogruMu: boolean;
+    ders: string;
+    konuIsim: string;
+  }>;
+  dersSkorlar: Record<string, { dogru: number; toplam: number }>;
+  toplamDogru: number;
+  toplamSoru: number;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,6 +27,12 @@ export default function RegisterPage() {
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [basarili, setBasarili] = useState(false);
+  const [diagnosticVar, setDiagnosticVar] = useState(false);
+
+  useEffect(() => {
+    const result = localStorage.getItem("lgs_diagnostic_result");
+    if (result) setDiagnosticVar(true);
+  }, []);
 
   const kayitOl = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +45,12 @@ export default function RegisterPage() {
       return;
     }
 
+    // Diagnostic sonuclarini al
+    const diagnosticRaw = localStorage.getItem("lgs_diagnostic_result");
+    const diagnosticResult: DiagnosticResult | null = diagnosticRaw
+      ? JSON.parse(diagnosticRaw)
+      : null;
+
     const supabase = createClient();
     const { error } = await supabase.auth.signUp({
       email,
@@ -35,22 +60,34 @@ export default function RegisterPage() {
           isim,
           sinif: parseInt(sinif),
           rol: "STUDENT",
+          // Diagnostic sonuclari metadata'ya kaydet
+          ...(diagnosticResult
+            ? {
+                diagnosticSkorlar: diagnosticResult.dersSkorlar,
+                diagnosticToplam: `${diagnosticResult.toplamDogru}/${diagnosticResult.toplamSoru}`,
+              }
+            : {}),
         },
       },
     });
 
     if (error) {
-      setHata(error.message === "User already registered"
-        ? "Bu e-posta zaten kayıtlı."
-        : "Kayıt sırasında bir hata oluştu.");
+      setHata(
+        error.message === "User already registered"
+          ? "Bu e-posta zaten kayıtlı."
+          : "Kayıt sırasında bir hata oluştu."
+      );
       setYukleniyor(false);
       return;
     }
 
+    // Basarili kayit
     setBasarili(true);
     setYukleniyor(false);
 
-    // 2 saniye sonra girise yonlendir
+    // Diagnostic sonuclarini temizle
+    localStorage.removeItem("lgs_diagnostic_result");
+
     setTimeout(() => router.push("/auth/login"), 2000);
   };
 
@@ -58,14 +95,17 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 text-center max-w-md w-full">
-          <div className="text-5xl mb-4">✓</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Kayıt Başarılı!
-          </h2>
-          <p className="text-gray-500 text-sm">
+          <p className="text-5xl mb-4">✓</p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Kayıt Başarılı!</h2>
+          <p className="text-gray-500 text-sm mb-4">
             E-postanı doğruladıktan sonra giriş yapabilirsin.
-            Yönlendiriliyorsun...
           </p>
+          {diagnosticVar && (
+            <p className="text-sm text-blue-600 font-medium">
+              Deneme sonuçların kaydedildi — giriş yaptığında çalışma planın hazır olacak.
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mt-3">Giriş sayfasına yönlendiriliyorsun...</p>
         </div>
       </div>
     );
@@ -76,10 +116,22 @@ export default function RegisterPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <Link href="/" className="text-2xl font-bold text-gray-900">
-            LGS AI Kocu
+            LGS AI Koçu
           </Link>
           <p className="text-gray-500 mt-2">Ücretsiz hesap oluştur</p>
         </div>
+
+        {/* Diagnostic sonuc ozeti */}
+        {diagnosticVar && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+            <p className="text-sm font-medium text-green-800">
+              ✓ Seviye belirleme sonuçların hazır!
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              Kayıt olduktan sonra bu sonuçlara göre kişisel çalışma planın oluşturulacak.
+            </p>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <form onSubmit={kayitOl} className="space-y-4">
@@ -151,7 +203,7 @@ export default function RegisterPage() {
               disabled={yukleniyor}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {yukleniyor ? "Kayıt olunuyor..." : "Kayıt Ol"}
+              {yukleniyor ? "Kayıt olunuyor..." : diagnosticVar ? "Kayıt Ol ve Planımı Oluştur" : "Kayıt Ol"}
             </button>
           </form>
 
@@ -165,6 +217,17 @@ export default function RegisterPage() {
             </Link>
           </div>
         </div>
+
+        {!diagnosticVar && (
+          <div className="mt-4 text-center">
+            <Link
+              href="/diagnostic"
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Önce seviyeni belirlemek ister misin? →
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

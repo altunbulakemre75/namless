@@ -29,7 +29,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // Diagnostic sonucu varsa callback'e yonlendir (DB'ye aktar)
+    const hasDiagnostic = localStorage.getItem("lgs_diagnostic_result");
+    router.push(hasDiagnostic ? "/auth/callback" : "/dashboard");
     router.refresh();
   };
 
