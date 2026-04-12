@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== IDENTITY CONTEXT ====================
+
+enum UserRole {
+  STUDENT
+  PARENT
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+model User {
+  id                 String           @id @default(uuid())
+  email              String           @unique
+  telefon            String?
+  rol                UserRole         @default(STUDENT)
+  isim               String
+  okulSinif          Int?
+  parentId           String?
+  parent             User?            @relation("ParentChild", fields: [parentId], references: [id])
+  children           User[]           @relation("ParentChild")
+  subscriptionTier   SubscriptionTier @default(FREE)
+  subscriptionEnd    DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  attempts           Attempt[]
+  masteries          Mastery[]
+  studyPlans         StudyPlan[]
+
+  @@map("users")
+}
+
+// ==================== CURRICULUM CONTEXT ====================
+
+enum Ders {
+  TURKCE
+  MATEMATIK
+  FEN
+  SOSYAL
+  INGILIZCE
+  DIN
+}
+
+model Topic {
+  id              String     @id @default(uuid())
+  parentId        String?
+  parent          Topic?     @relation("TopicHierarchy", fields: [parentId], references: [id])
+  children        Topic[]    @relation("TopicHierarchy")
+  ders            Ders
+  isim            String
+  mufredatYili    Int        @default(2026)
+  kazanimlar      String[]
+  onkosuller      String[]   // topic id'leri
+  zorlukKolay     Float      @default(0.33)
+  zorlukOrta      Float      @default(0.34)
+  zorlukZor       Float      @default(0.33)
+  tarihselAgirlik Float      @default(0)
+  questions       Question[]
+  masteries       Mastery[]
+
+  @@map("topics")
+}
+
+enum QuestionKaynak {
+  CIKMIS
+  AI_URETIM
+  OGRETMEN
+}
+
+enum ValidationStatus {
+  DRAFT
+  REVIEWED
+  PUBLISHED
+  FLAGGED
+}
+
+model Question {
+  id               String           @id @default(uuid())
+  topicId          String
+  topic            Topic            @relation(fields: [topicId], references: [id])
+  kaynak           QuestionKaynak
+  kaynakYili       Int?
+  zorluk           Int              // 1-3
+  soruMetni        String
+  siklar           String[]
+  dogruSik         Int              // 0-3
+  aciklama         String
+  aiModel          String?
+  validationStatus ValidationStatus @default(DRAFT)
+  kullanimSayisi   Int              @default(0)
+  dogrulukOrani    Float            @default(0)
+  createdAt        DateTime         @default(now())
+  attempts         Attempt[]
+
+  @@index([topicId, zorluk])
+  @@index([validationStatus])
+  @@map("questions")
+}
+
+// ==================== ASSESSMENT CONTEXT ====================
+
+enum AttemptBaglam {
+  DIAGNOSTIC
+  DAILY
+  REVIEW
+  MOCK_EXAM
+}
+
+// EVENT tablosu — satir asla guncellenmez!
+model Attempt {
+  id         String        @id @default(uuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id])
+  questionId String
+  question   Question      @relation(fields: [questionId], references: [id])
+  secilenSik Int
+  dogruMu    Boolean
+  sureMs     Int
+  tarih      DateTime      @default(now())
+  baglam     AttemptBaglam
+
+  @@index([userId, tarih])
+  @@index([userId, questionId])
+  @@map("attempts")
+}
+
+// Turetilmis veri — Attempt'lerden yeniden hesaplanabilir
+model Mastery {
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  topicId        String
+  topic          Topic    @relation(fields: [topicId], references: [id])
+  skor           Float    @default(0)
+  guvenAraligi   Float    @default(25)
+  sonGuncelleme  DateTime @default(now())
+  versiyon       Int      @default(1)
+
+  @@id([userId, topicId])
+  @@map("masteries")
+}
+
+// ==================== LEARNING CONTEXT ====================
+
+enum SessionDurum {
+  PENDING
+  ACTIVE
+  DONE
+}
+
+model StudyPlan {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  hedefTarih    DateTime
+  gunlukDakika  Int            @default(60)
+  planVersiyonu Int            @default(1)
+  createdAt     DateTime       @default(now())
+  sessions      DailySession[]
+
+  @@index([userId])
+  @@map("study_plans")
+}
+
+model DailySession {
+  id             String       @id @default(uuid())
+  studyPlanId    String
+  studyPlan      StudyPlan    @relation(fields: [studyPlanId], references: [id])
+  tarih          DateTime
+  hedefTopicIds  String[]
+  tahminiSure    Int          // dakika
+  durum          SessionDurum @default(PENDING)
+  attemptIds     String[]
+
+  @@index([studyPlanId, tarih])
+  @@map("daily_sessions")
+}
