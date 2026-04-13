@@ -24,6 +24,7 @@ export default function DashboardClient({ userName }: Props) {
   const { data: profile } = trpc.learning.getProfile.useQuery();
   const { data: studyStats } = trpc.learning.getStudyStats.useQuery();
   const { data: todaySession } = trpc.assessment.getTodaySession.useQuery();
+  const { data: coachComment } = trpc.learning.getCoachComment.useQuery();
 
   const cikisYap = async () => {
     const supabase = createClient();
@@ -175,6 +176,25 @@ export default function DashboardClient({ userName }: Props) {
             </p>
           </div>
         </div>
+
+        {/* AI Koç Kartı */}
+        {coachComment && (
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-5 mb-6">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">🤖</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-purple-900 mb-1">AI Koç Yorumu</p>
+                <p className="text-sm text-purple-700 leading-relaxed">{coachComment.yorum}</p>
+                <div className="flex items-center gap-4 mt-3 text-xs text-purple-500">
+                  {coachComment.toplamSoru > 0 && (
+                    <span>Bu hafta {coachComment.toplamSoru} soru · %{Math.round(coachComment.dogruOrani * 100)} doğru</span>
+                  )}
+                  {coachComment.streak > 0 && <span>🔥 {coachComment.streak} gün seri</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Seviye belirleme CTA */}
         {!masteriesLoading && (!masteries || masteries.length === 0) && (

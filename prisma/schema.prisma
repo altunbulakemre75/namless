@@ -56,6 +56,8 @@ model User {
   mockExams          MockExam[]
   studySessions      StudySession[]
   subscriptions      Subscription[]
+  learningProfile    LearningProfile?
+  studentMemory      StudentMemory?
 
   @@map("users")
 }
@@ -94,6 +96,7 @@ model Topic {
   questions       Question[]
   masteries       Mastery[]
   kitapMetinleri  KitapMetni[]
+  contentChunks   ContentChunk[]
 
   @@map("topics")
 }
@@ -321,4 +324,64 @@ model Subscription {
 
   @@index([userId])
   @@map("subscriptions")
+}
+
+// ==================== RAG CONTENT CHUNKS ====================
+
+model ContentChunk {
+  id          String   @id @default(uuid())
+  topicId     String?
+  topic       Topic?   @relation(fields: [topicId], references: [id])
+  ders        Ders
+  kaynak      String
+  bolum       String
+  icerik      String   @db.Text
+  sayfaAralik String?
+  createdAt   DateTime @default(now())
+
+  @@index([topicId])
+  @@index([ders])
+  @@map("content_chunks")
+}
+
+// ==================== LEARNING PROFILE (Faz 4) ====================
+
+enum OgrenmeStili {
+  ORNEKLI
+  FORMULLU
+  ADIM_ADIM
+  GORSEL
+}
+
+model LearningProfile {
+  id              String        @id @default(uuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id])
+  enEtkiliStil    OgrenmeStili?
+  ortCozumSureMs  Int           @default(30000)
+  enAktifSaat     Int?
+  zayifNoktaOzeti String?       @db.Text
+  sonGuncelleme   DateTime      @default(now())
+
+  @@map("learning_profiles")
+}
+
+// ==================== STUDENT MEMORY (Hermes uyarlaması) ====================
+
+model StudentMemory {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  zayifKonular    String[]
+  gucluKonular    String[]
+  hataEgilimi     String?  // en sık hata kategorisi
+  ogrenmeStili    String?  // ORNEKLI | FORMULLU | ADIM_ADIM | GORSEL
+  motivasyonNotu  String?  @db.Text
+  sonOturumOzeti  String?  @db.Text
+  toplamOturum    Int      @default(0)
+  toplamSureDk    Int      @default(0)
+  stilSkorlari    Json?    // {"ORNEKLI": 15, "FORMULLU": 3}
+  sonGuncelleme   DateTime @default(now())
+
+  @@map("student_memories")
 }

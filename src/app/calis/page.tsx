@@ -74,11 +74,21 @@ function CalisPageInner() {
     { topicId }, { enabled: !!topicId }
   );
 
+  // AI sorgular
+  const { data: personalizedLesson, isLoading: lessonLoading } = trpc.learning.getPersonalizedLesson.useQuery(
+    { topicId }, { enabled: !!topicId && asama === "konu" }
+  );
+  const { data: coachComment } = trpc.learning.getCoachComment.useQuery(
+    undefined, { enabled: asama === "karar" }
+  );
+
   // Mutasyonlar
   const submitMutation = trpc.assessment.submitAnswer.useMutation();
   const recordMutation = trpc.learning.recordStudyTime.useMutation();
   const updateMasteryMutation = trpc.learning.updateMasteryFromReview.useMutation();
   const kategorizeHataMutation = trpc.learning.kategorizeHata.useMutation();
+  const [aiAnalysis, setAiAnalysis] = useState<{ aciklama: string; hataKategorisi: string; oneri: string } | null>(null);
+  const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
 
   const sorular = adaptifData?.sorular ?? [];
 
@@ -121,12 +131,11 @@ function CalisPageInner() {
       baglam: "REVIEW",
     });
 
-    // attemptId backend'den dönmüyor, sadece dogruMu ve aciklama var
-    setCevapSonuc({ ...sonuc, attemptId: undefined });
+    setCevapSonuc({ ...sonuc, attemptId: sonuc.attemptId });
 
     const yeniSonuc: SoruSonuc = {
       soruId: soru.id,
-      attemptId: null, // backend attemptId dönmüyor
+      attemptId: sonuc.attemptId ?? null,
       dogruMu: sonuc.dogruMu,
       sure: sureMs,
       hataKategori: null,
@@ -134,7 +143,12 @@ function CalisPageInner() {
     setSoruSonuclari(prev => [...prev, yeniSonuc]);
 
     if (!sonuc.dogruMu) {
-      setHataKategoriSecimi(`${soruIdx}`); // hata kategori seçimini aç
+      setHataKategoriSecimi(`${soruIdx}`);
+      // AI analiz başlat
+      if (sonuc.attemptId) {
+        setAiAnalysisLoading(true);
+        setAiAnalysis(null);
+      }
     }
 
     soruBaslangicRef.current = Date.now();
@@ -280,8 +294,20 @@ function CalisPageInner() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-4">{topic.isim}</h1>
 
-            {/* Öncelik: 1) AI anlatım 2) Manuel içerik 3) Boş mesaj */}
-            {(topic as { aiAnlatim?: string | null }).aiAnlatim ? (
+            {/* Öncelik: 1) Kişiselleştirilmiş AI anlatım 2) Statik AI anlatım 3) Manuel içerik 4) Boş mesaj */}
+            {lessonLoading ? (
+              <div className="bg-indigo-50 rounded-xl p-6 text-center">
+                <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm text-indigo-600 font-medium">Sana özel anlatım hazırlanıyor...</p>
+              </div>
+            ) : personalizedLesson?.anlatim ? (
+              <div className="prose prose-sm text-gray-700 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
+                {personalizedLesson.anlatim}
+                {personalizedLesson.ragKaynak && (
+                  <p className="text-xs text-indigo-400 mt-3 italic">MEB kitap içeriğinden desteklendi</p>
+                )}
+              </div>
+            ) : (topic as { aiAnlatim?: string | null }).aiAnlatim ? (
               <div className="prose prose-sm text-gray-700 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
                 {(topic as { aiAnlatim?: string | null }).aiAnlatim}
               </div>
@@ -420,6 +446,21 @@ function CalisPageInner() {
               <p className={`text-sm leading-relaxed ${cevapSonuc.dogruMu ? "text-green-700" : "text-orange-700"}`}>
                 {cevapSonuc.aciklama}
               </p>
+              {/* AI Detaylı Analiz */}
+              {!cevapSonuc.dogruMu && aiAnalysisLoading && (
+                <div className="mt-3 pt-3 border-t border-orange-200">
+                  <p className="text-xs text-orange-500">AI analiz yapılıyor...</p>
+                </div>
+              )}
+              {!cevapSonuc.dogruMu && aiAnalysis && (
+                <div className="mt-3 pt-3 border-t border-orange-200">
+                  <p className="text-xs font-semibold text-orange-800 mb-1">AI Analiz:</p>
+                  <p className="text-xs text-orange-700">{aiAnalysis.aciklama}</p>
+                  {aiAnalysis.oneri && (
+                    <p className="text-xs text-orange-600 mt-1 italic">{aiAnalysis.oneri}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -559,6 +600,14 @@ function CalisPageInner() {
                 <span className="text-[9px] text-green-600 font-bold">{yuzde}%</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Koç Yorumu */}
+        {coachComment && (
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
+            <p className="text-xs font-semibold text-purple-800 mb-1">AI Koç Yorumu</p>
+            <p className="text-sm text-purple-700">{coachComment.yorum}</p>
           </div>
         )}
 

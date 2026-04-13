@@ -4,6 +4,17 @@ import { MasteryCalculator } from "../../domain/assessment/services/mastery-calc
 import { StudyPlanGenerator } from "../../domain/learning/services/study-plan-generator";
 import { AttemptBaglam } from "../../domain/assessment/entities/attempt";
 import { processDiagnostic } from "../../domain/assessment/services/diagnostic-processor";
+import { searchRelevantContent } from "../../infrastructure/rag/search";
+import {
+  generatePersonalizedLesson,
+  analyzeWrongAnswer,
+  generateCoachComment,
+  generateHint,
+} from "../../infrastructure/ai/prompt-engine";
+import { getCachedOrGenerate } from "../../infrastructure/cache/redis";
+import { StudentMemoryProvider } from "../../infrastructure/memory/student-memory-provider";
+import { WeeklyReportGenerator } from "../../infrastructure/report/weekly-report-generator";
+import { runExpertPanel, shouldTriggerExpertPanel } from "../../infrastructure/ai/expert-panel";
 
 const masteryCalc = new MasteryCalculator();
 const planGenerator = new StudyPlanGenerator();
@@ -607,6 +618,319 @@ export const learningRouter = router({
 
     return null;
   }),
+
+  // ==================== FAZ 3: AI PROMPT ENGINE ENDPOINTS ====================
+
+  // Kişiselleştirilmiş ders anlatımı
+  getPersonalizedLesson: protectedProcedure
+    .input(z.object({ topicId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const topic = await ctx.prisma.topic.findUniqueOrThrow({
+        where: { id: input.topicId },
+        select: { id: true, isim: true, ders: true, aiAnlatim: true },
+      });
+
+      const mastery = await ctx.prisma.mastery.findUnique({
+        where: { userId_topicId: { userId, topicId: input.topicId } },
+      });
+
+      const learningProfile = await ctx.prisma.learningProfile.findUnique({
+        where: { userId },
+      });
+
+      const ragResults = await searchRelevantContent(ctx.prisma, {
+        topicId: input.topicId,
+        topicIsim: topic.isim,
+        ders: topic.ders,
+        limit: 3,
+      });
+
+      const seviye = (mastery?.skor ?? 30) < 40 ? "baslangic" : (mastery?.skor ?? 30) < 70 ? "orta" : "ileri";
+      const cacheKey = `lesson:${input.topicId}:${seviye}`;
+
+      const anlatim = await getCachedOrGenerate(cacheKey, 3600, () =>
+        generatePersonalizedLesson(
+          topic.isim,
+          topic.ders,
+          ragResults,
+          {
+            masteryScore: mastery?.skor ?? 30,
+            enEtkiliStil: learningProfile?.enEtkiliStil ?? null,
+            ortCozumSureMs: learningProfile?.ortCozumSureMs ?? 30000,
+          }
+        )
+      );
+
+      return { anlatim, topicIsim: topic.isim, ders: topic.ders, ragKaynak: ragResults.length > 0 };
+    }),
+
+  // Yanlış cevap analizi
+  getWrongAnswerAnalysis: protectedProcedure
+    .input(z.object({ attemptId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const attempt = await ctx.prisma.attempt.findUniqueOrThrow({
+        where: { id: input.attemptId },
+        include: { question: { include: { topic: true } } },
+      });
+
+      if (attempt.userId !== userId) throw new Error("Yetkisiz erişim");
+      if (attempt.dogruMu) return { hataKategorisi: null, aciklama: "Bu soruyu doğru cevapladın!", oneri: null };
+
+      const mastery = await ctx.prisma.mastery.findUnique({
+        where: { userId_topicId: { userId, topicId: attempt.question.topicId } },
+      });
+
+      const learningProfile = await ctx.prisma.learningProfile.findUnique({
+        where: { userId },
+      });
+
+      const ragResults = await searchRelevantContent(ctx.prisma, {
+        topicId: attempt.question.topicId,
+        topicIsim: attempt.question.topic.isim,
+        ders: attempt.question.topic.ders,
+        limit: 2,
+      });
+
+      const analysis = await analyzeWrongAnswer(
+        attempt.question.soruMetni,
+        attempt.question.siklar,
+        attempt.question.dogruSik,
+        attempt.secilenSik,
+        ragResults,
+        {
+          masteryScore: mastery?.skor ?? 30,
+          ortCozumSureMs: learningProfile?.ortCozumSureMs ?? 30000,
+        }
+      );
+
+      // Hata kategorisini attempt'e kaydet
+      if (analysis.hataKategorisi && analysis.hataKategorisi !== "BILINMIYOR") {
+        await ctx.prisma.attempt.update({
+          where: { id: input.attemptId },
+          data: { hataKategorisi: analysis.hataKategorisi as "KAVRAM_EKSIK" | "DIKKATSIZLIK" | "KONU_ATLAMA" | "ZAMAN_BASKISI" },
+        });
+      }
+
+      return analysis;
+    }),
+
+  // Koç yorumu (haftalık)
+  getCoachComment: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    const yediGunOnce = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [attempts, masteries, user] = await Promise.all([
+      ctx.prisma.attempt.findMany({
+        where: { userId, tarih: { gte: yediGunOnce } },
+        include: { question: { select: { topic: { select: { ders: true } } } } },
+      }),
+      ctx.prisma.mastery.findMany({
+        where: { userId },
+        include: { topic: { select: { ders: true } } },
+      }),
+      ctx.prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+    ]);
+
+    const toplamSoru = attempts.length;
+    const dogruSayisi = attempts.filter((a) => a.dogruMu).length;
+    const dogruOrani = toplamSoru > 0 ? dogruSayisi / toplamSoru : 0;
+
+    // Hata kategorileri
+    const hatalar = attempts
+      .filter((a) => !a.dogruMu && a.hataKategorisi)
+      .map((a) => a.hataKategorisi!);
+    const hataFreq = new Map<string, number>();
+    hatalar.forEach((h) => hataFreq.set(h, (hataFreq.get(h) ?? 0) + 1));
+    const enCokHata = [...hataFreq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "BILINMIYOR";
+
+    // Ders bazında
+    const dersSkoru = new Map<string, number[]>();
+    masteries.forEach((m) => {
+      const d = m.topic.ders;
+      if (!dersSkoru.has(d)) dersSkoru.set(d, []);
+      dersSkoru.get(d)!.push(m.skor);
+    });
+
+    const zayifDersler: string[] = [];
+    const gucluDersler: string[] = [];
+    dersSkoru.forEach((skorlar, ders) => {
+      const avg = skorlar.reduce((s, v) => s + v, 0) / skorlar.length;
+      if (avg < 50) zayifDersler.push(ders);
+      else if (avg >= 70) gucluDersler.push(ders);
+    });
+
+    const bugunStr = new Date().toISOString().slice(0, 10);
+    const coachCacheKey = `coach:${userId}:${bugunStr}`;
+
+    const yorum = await getCachedOrGenerate(coachCacheKey, 43200, () =>
+      generateCoachComment({
+        toplamSoru,
+        dogruOrani,
+        streak: user.currentStreak,
+        enCokHata,
+        zayifDersler,
+        gucluDersler,
+        masteryDegisim: {},
+      })
+    );
+
+    return { yorum, toplamSoru, dogruOrani, streak: user.currentStreak };
+  }),
+
+  // Soru ipucu
+  getQuestionHint: protectedProcedure
+    .input(z.object({ soruMetni: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const mastery = await ctx.prisma.mastery.findFirst({
+        where: { userId },
+        orderBy: { skor: "asc" },
+      });
+
+      const hint = await generateHint(input.soruMetni, {
+        masteryScore: mastery?.skor ?? 50,
+      });
+
+      return { ipucu: hint };
+    }),
+
+  // Öğrenme profili güncelle
+  updateLearningProfile: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    const OTUZgun = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const attempts = await ctx.prisma.attempt.findMany({
+      where: { userId, tarih: { gte: OTUZgun } },
+      select: { sureMs: true, dogruMu: true, hataKategorisi: true, tarih: true },
+    });
+
+    if (attempts.length === 0) return { guncellendi: false };
+
+    // Ortalama çözüm süresi
+    const ortCozumSureMs = Math.round(
+      attempts.reduce((s, a) => s + a.sureMs, 0) / attempts.length
+    );
+
+    // En aktif saat
+    const saatFreq = new Map<number, number>();
+    attempts.forEach((a) => {
+      const saat = new Date(a.tarih).getHours();
+      saatFreq.set(saat, (saatFreq.get(saat) ?? 0) + 1);
+    });
+    const enAktifSaat = [...saatFreq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+    // Zayıf nokta özeti
+    const hatalar = attempts.filter((a) => !a.dogruMu && a.hataKategorisi);
+    const hataFreq = new Map<string, number>();
+    hatalar.forEach((a) => hataFreq.set(a.hataKategorisi!, (hataFreq.get(a.hataKategorisi!) ?? 0) + 1));
+    const zayifNoktaOzeti = [...hataFreq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+
+    await ctx.prisma.learningProfile.upsert({
+      where: { userId },
+      update: { ortCozumSureMs, enAktifSaat, zayifNoktaOzeti, sonGuncelleme: new Date() },
+      create: { userId, ortCozumSureMs, enAktifSaat, zayifNoktaOzeti },
+    });
+
+    return { guncellendi: true, ortCozumSureMs, enAktifSaat };
+  }),
+
+  // ==================== HAFTALIK RAPOR ====================
+
+  getWeeklyReport: protectedProcedure.query(async ({ ctx }) => {
+    const generator = new WeeklyReportGenerator(ctx.prisma);
+    return generator.generate(ctx.user.id);
+  }),
+
+  // ==================== UZMAN PANEL (Multi-Agent) ====================
+
+  getExpertPanelAnalysis: protectedProcedure
+    .input(z.object({
+      attemptId: z.string(),
+      manuelTetik: z.boolean().default(false),
+    }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const attempt = await ctx.prisma.attempt.findUniqueOrThrow({
+        where: { id: input.attemptId },
+        include: { question: { include: { topic: true } } },
+      });
+
+      if (attempt.userId !== userId) throw new Error("Yetkisiz erişim");
+      if (attempt.dogruMu) return null;
+
+      const user = await ctx.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+
+      // Aynı konuda kaç kez yanlış?
+      const tekrarYanlis = await ctx.prisma.attempt.count({
+        where: { userId, dogruMu: false, question: { topicId: attempt.question.topicId } },
+      });
+
+      const tetikle = shouldTriggerExpertPanel({
+        isPremium: user.subscriptionTier !== "FREE",
+        zorluk: attempt.question.zorluk,
+        tekrarYanlisSayisi: tekrarYanlis,
+        manuelTetik: input.manuelTetik,
+      });
+
+      if (!tetikle) return { tetiklendi: false, neden: "Koşullar sağlanmadı" };
+
+      // Öğrenci bağlamı
+      const memProvider = new StudentMemoryProvider(ctx.prisma);
+      const studentCtx = await memProvider.prefetch(userId);
+      const promptCtx = memProvider.buildPromptContext(studentCtx);
+
+      const result = await runExpertPanel(
+        attempt.question.soruMetni,
+        attempt.question.siklar,
+        attempt.question.dogruSik,
+        attempt.secilenSik,
+        promptCtx,
+      );
+
+      // Hata kategorisini kaydet
+      if (result.hataKategorisi && result.hataKategorisi !== "BILINMIYOR") {
+        await ctx.prisma.attempt.update({
+          where: { id: input.attemptId },
+          data: { hataKategorisi: result.hataKategorisi as "KAVRAM_EKSIK" | "DIKKATSIZLIK" | "KONU_ATLAMA" | "ZAMAN_BASKISI" },
+        });
+      }
+
+      return { tetiklendi: true, ...result };
+    }),
+
+  // ==================== HAFIZA SİSTEMİ (Hermes uyarlaması) ====================
+
+  // Oturum öncesi öğrenci bağlamını çek
+  getStudentContext: protectedProcedure
+    .input(z.object({ topicId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const provider = new StudentMemoryProvider(ctx.prisma);
+      return provider.prefetch(ctx.user.id, input?.topicId);
+    }),
+
+  // Oturum sonrası hafızayı güncelle
+  syncSessionMemory: protectedProcedure
+    .input(z.object({
+      topicId: z.string(),
+      topicIsim: z.string(),
+      dogruSayisi: z.number(),
+      yanlisSayisi: z.number(),
+      hataKategorileri: z.array(z.string()),
+      kullanilanStil: z.string().optional(),
+      oncekiMastery: z.number(),
+      sonrakiMastery: z.number(),
+      sureDk: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const provider = new StudentMemoryProvider(ctx.prisma);
+      await provider.syncAfterSession(ctx.user.id, input);
+      return { basarili: true };
+    }),
 
   // Konu detayi
   getTopicDetail: protectedProcedure
