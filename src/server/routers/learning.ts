@@ -642,12 +642,24 @@ export const learningRouter = router({
         where: { userId },
       });
 
-      const ragResults = await searchRelevantContent(ctx.prisma, {
+      // Hibrit RAG: topicId + fuzzy + ders fallback + mastery reranking
+      const hybridChunks = await hybridSearch(ctx.prisma, {
         topicId: input.topicId,
         topicIsim: topic.isim,
         ders: topic.ders,
-        limit: 3,
+        masterySkoru: mastery?.skor ?? 30,
+        limit: 4,
       });
+
+      // Fallback: chunk yoksa eski basit arama dene
+      const ragResults = hybridChunks.length > 0
+        ? hybridChunks.map((c) => ({ icerik: c.icerik, bolum: c.bolum, kaynak: c.kaynak, similarity: c.skor }))
+        : await searchRelevantContent(ctx.prisma, {
+            topicId: input.topicId,
+            topicIsim: topic.isim,
+            ders: topic.ders,
+            limit: 3,
+          });
 
       const seviye = (mastery?.skor ?? 30) < 40 ? "baslangic" : (mastery?.skor ?? 30) < 70 ? "orta" : "ileri";
       const cacheKey = `lesson:${input.topicId}:${seviye}`;
@@ -665,7 +677,13 @@ export const learningRouter = router({
         )
       );
 
-      return { anlatim, topicIsim: topic.isim, ders: topic.ders, ragKaynak: ragResults.length > 0 };
+      return {
+        anlatim,
+        topicIsim: topic.isim,
+        ders: topic.ders,
+        ragKaynak: ragResults.length > 0,
+        hybridKullanildi: hybridChunks.length > 0,
+      };
     }),
 
   // Yanlış cevap analizi
@@ -708,13 +726,8 @@ export const learningRouter = router({
         }
       );
 
-      // Hata kategorisini attempt'e kaydet
-      if (analysis.hataKategorisi && analysis.hataKategorisi !== "BILINMIYOR") {
-        await ctx.prisma.attempt.update({
-          where: { id: input.attemptId },
-          data: { hataKategorisi: analysis.hataKategorisi as "KAVRAM_EKSIK" | "DIKKATSIZLIK" | "KONU_ATLAMA" | "ZAMAN_BASKISI" },
-        });
-      }
+      // NOT: Attempt immutable — hataKategorisi attempt'e yazılmaz.
+      // Analiz sonucu yalnızca dönüş değeri olarak kullanılır.
 
       return analysis;
     }),
@@ -895,14 +908,7 @@ export const learningRouter = router({
         promptCtx,
       );
 
-      // Hata kategorisini kaydet
-      if (result.hataKategorisi && result.hataKategorisi !== "BILINMIYOR") {
-        await ctx.prisma.attempt.update({
-          where: { id: input.attemptId },
-          data: { hataKategorisi: result.hataKategorisi as "KAVRAM_EKSIK" | "DIKKATSIZLIK" | "KONU_ATLAMA" | "ZAMAN_BASKISI" },
-        });
-      }
-
+      // NOT: Attempt immutable — hataKategorisi attempt'e yazılmaz.
       return { tetiklendi: true, ...result };
     }),
 
@@ -935,6 +941,91 @@ export const learningRouter = router({
       return { basarili: true };
     }),
 
+  // Smart solver — mutation (imperatively triggered from UI after wrong answer)
+  runSmartSolver: protectedProcedure
+    .input(z.object({ attemptId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const attempt = await ctx.prisma.attempt.findUniqueOrThrow({
+        where: { id: input.attemptId },
+        include: { question: { select: { soruMetni: true, siklar: true, dogruSik: true, topicId: true } } },
+      });
+      if (attempt.userId !== userId) throw new Error("Yetkisiz erişim");
+      if (attempt.dogruMu) return null;
+
+      const mastery = await ctx.prisma.mastery.findUnique({
+        where: { userId_topicId: { userId, topicId: attempt.question.topicId } },
+      });
+
+      return analyzeWithSmartSolver({
+        soruMetni: attempt.question.soruMetni,
+        siklar: attempt.question.siklar,
+        dogruSik: attempt.question.dogruSik,
+        secilenSik: attempt.secilenSik,
+        masterySkoru: mastery?.skor ?? 30,
+      });
+    }),
+
+  // ==================== GENEL MASTERY TAHMİN (Dashboard için) ====================
+
+  getOverallMasteryPrediction: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    const altmisGunOnce = new Date(Date.now() - 60 * 86400000);
+
+    // En zayıf 3 konu
+    const zayifMasteries = await ctx.prisma.mastery.findMany({
+      where: { userId },
+      orderBy: { skor: "asc" },
+      take: 3,
+      include: { topic: { select: { id: true, isim: true, ders: true } } },
+    });
+
+    if (zayifMasteries.length === 0) return null;
+
+    // Her zayıf konu için tahmin üret
+    const tahminler = await Promise.all(
+      zayifMasteries.map(async (m) => {
+        const attempts = await ctx.prisma.attempt.findMany({
+          where: { userId, question: { topicId: m.topicId }, tarih: { gte: altmisGunOnce } },
+          orderBy: { tarih: "asc" },
+          select: { dogruMu: true, tarih: true },
+        });
+
+        const gunlukGrup = new Map<string, { dogru: number; toplam: number }>();
+        for (const a of attempts) {
+          const tarihStr = a.tarih.toISOString().slice(0, 10);
+          if (!gunlukGrup.has(tarihStr)) gunlukGrup.set(tarihStr, { dogru: 0, toplam: 0 });
+          const g = gunlukGrup.get(tarihStr)!;
+          g.toplam++;
+          if (a.dogruMu) g.dogru++;
+        }
+
+        const dataPoints = [...gunlukGrup.entries()].map(([tarihStr, g]) => ({
+          tarih: new Date(tarihStr),
+          skor: Math.round((g.dogru / g.toplam) * 100),
+        }));
+
+        const p = predictMastery(dataPoints, m.skor);
+        return {
+          topicId: m.topicId,
+          topicIsim: m.topic.isim,
+          ders: m.topic.ders,
+          mevcutSkor: p.mevcutSkor,
+          tahminiLgsSkor: p.tahminiLgsSkor,
+          trend: p.trend,
+          lgsDaysLeft: p.lgsDaysLeft,
+        };
+      })
+    );
+
+    // Genel hazırlık ortalaması
+    const genelOrtalama = Math.round(
+      tahminler.reduce((s, t) => s + t.tahminiLgsSkor, 0) / tahminler.length
+    );
+
+    return { tahminler, genelOrtalama, lgsDaysLeft: tahminler[0]?.lgsDaysLeft ?? 0 };
+  }),
+
   // ==================== SMART SOLVER (DeepTutor çift döngü) ====================
 
   getSmartSolverAnalysis: protectedProcedure
@@ -961,15 +1052,7 @@ export const learningRouter = router({
         masterySkoru: mastery?.skor ?? 30,
       });
 
-      // Hata kategorisini kaydet
-      const gecerliKatlar = ["KAVRAM_EKSIK", "DIKKATSIZLIK", "KONU_ATLAMA", "ZAMAN_BASKISI"];
-      if (gecerliKatlar.includes(result.hataKategorisi)) {
-        await ctx.prisma.attempt.update({
-          where: { id: input.attemptId },
-          data: { hataKategorisi: result.hataKategorisi as "KAVRAM_EKSIK" | "DIKKATSIZLIK" | "KONU_ATLAMA" | "ZAMAN_BASKISI" },
-        });
-      }
-
+      // NOT: Attempt immutable — hataKategorisi attempt'e yazılmaz.
       return result;
     }),
 

@@ -58,6 +58,7 @@ model User {
   subscriptions      Subscription[]
   learningProfile    LearningProfile?
   studentMemory      StudentMemory?
+  bildirimler        Bildirim[]
 
   @@map("users")
 }
@@ -384,4 +385,29 @@ model StudentMemory {
   sonGuncelleme   DateTime @default(now())
 
   @@map("student_memories")
+}
+
+// ==================== BİLDİRİM SİSTEMİ ====================
+
+enum BildirimTip {
+  STREAK_RISK     // 2+ gün çalışmamış
+  HAFTALIK_RAPOR  // Otomatik haftalık rapor
+  LGS_YAKLASIM   // LGS'ye 90/60/30/14/7/1 gün
+  KONU_ONERI      // Zayıf konu öneri
+}
+
+model Bildirim {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  tip       BildirimTip
+  baslik    String
+  mesaj     String      @db.Text
+  okundu    Boolean     @default(false)
+  veri      Json?       // Ek veri (topicId, skor, vs.)
+  createdAt DateTime    @default(now())
+
+  @@index([userId, okundu])
+  @@index([userId, createdAt])
+  @@map("bildirimler")
 }

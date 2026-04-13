@@ -25,6 +25,7 @@ export default function DashboardClient({ userName }: Props) {
   const { data: studyStats } = trpc.learning.getStudyStats.useQuery();
   const { data: todaySession } = trpc.assessment.getTodaySession.useQuery();
   const { data: coachComment } = trpc.learning.getCoachComment.useQuery();
+  const { data: masteryPrediction } = trpc.learning.getOverallMasteryPrediction.useQuery();
 
   const cikisYap = async () => {
     const supabase = createClient();
@@ -192,6 +193,33 @@ export default function DashboardClient({ userName }: Props) {
                   {coachComment.streak > 0 && <span>🔥 {coachComment.streak} gün seri</span>}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mastery Tahmin Kartı */}
+        {masteryPrediction && masteryPrediction.tahminler.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700">LGS Tahmin ({masteryPrediction.lgsDaysLeft} gün kaldı)</h3>
+              <span className={`text-sm font-bold ${masteryPrediction.genelOrtalama >= 70 ? "text-green-600" : masteryPrediction.genelOrtalama >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+                %{masteryPrediction.genelOrtalama} tahmini
+              </span>
+            </div>
+            <div className="space-y-2">
+              {masteryPrediction.tahminler.map((t) => (
+                <div key={t.topicId} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 w-32 truncate">{t.topicIsim}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${t.tahminiLgsSkor >= 70 ? "bg-green-500" : t.tahminiLgsSkor >= 50 ? "bg-yellow-500" : "bg-red-400"}`}
+                      style={{ width: `${t.tahminiLgsSkor}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium text-gray-600 w-8 text-right">%{t.tahminiLgsSkor}</span>
+                  <span className="text-xs">{t.trend === "yukselis" ? "↑" : t.trend === "duslus" ? "↓" : "→"}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

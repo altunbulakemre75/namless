@@ -3,6 +3,18 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../trpc";
 import { generateQuestions } from "../../infrastructure/ai/question-generator";
 
+// Basit bigram benzerlik ölçüsü (duplikasyon tespiti)
+function stringSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  const getBigrams = (s: string) => new Set(Array.from({ length: s.length - 1 }, (_, i) => s.slice(i, i + 2)));
+  const bigramsA = getBigrams(a);
+  const bigramsB = getBigrams(b);
+  let intersection = 0;
+  bigramsA.forEach((bg) => { if (bigramsB.has(bg)) intersection++; });
+  return (2 * intersection) / (bigramsA.size + bigramsB.size);
+}
+
 // Admin middleware: Prisma'dan rol kontrolü
 const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   const dbUser = await ctx.prisma.user.findUnique({
@@ -269,12 +281,28 @@ export const adminRouter = router({
         select: { isim: true, ders: true, kazanimlar: true },
       });
 
-      const { sorular, basarisizAdet } = await generateQuestions({
+      // Mevcut soruları çek — duplikasyon önleme için ilk 5 kelime karşılaştırması
+      const mevcutSorular = await ctx.prisma.question.findMany({
+        where: { topicId: input.topicId },
+        select: { soruMetni: true },
+        take: 50,
+      });
+      const mevcutMetinler = mevcutSorular.map((s) =>
+        s.soruMetni.slice(0, 60).toLowerCase().replace(/\s+/g, " ").trim()
+      );
+
+      const { sorular: tumSorular, basarisizAdet } = await generateQuestions({
         topicIsim: topic.isim,
         ders: topic.ders,
         zorluk: input.zorluk as 1 | 2 | 3,
         adet: input.adet,
         kazanimlar: topic.kazanimlar as string[],
+      });
+
+      // Duplikasyon filtresi: mevcut sorularla %70+ benzerlik varsa çıkar
+      const sorular = tumSorular.filter((s) => {
+        const yeniOnEk = s.soruMetni.slice(0, 60).toLowerCase().replace(/\s+/g, " ").trim();
+        return !mevcutMetinler.some((m) => stringSimilarity(m, yeniOnEk) > 0.7);
       });
 
       const olusturulanIds: string[] = [];
@@ -296,15 +324,16 @@ export const adminRouter = router({
         olusturulanIds.push(created.id);
       }
 
-      const uyari = basarisizAdet > 0
-        ? `${basarisizAdet} soru üretilemedi. API key kontrolü gerekebilir.`
-        : undefined;
+      const filtreEdilen = tumSorular.length - sorular.length;
+      const uyarilar: string[] = [];
+      if (basarisizAdet > 0) uyarilar.push(`${basarisizAdet} soru üretilemedi.`);
+      if (filtreEdilen > 0) uyarilar.push(`${filtreEdilen} soru mevcut sorularla benzer olduğu için çıkarıldı.`);
 
       return {
         olusturulanIds,
         basariliAdet: sorular.length,
-        basarisizAdet,
-        uyari,
+        basarisizAdet: basarisizAdet + filtreEdilen,
+        uyari: uyarilar.length > 0 ? uyarilar.join(" ") : undefined,
       };
     }),
 });

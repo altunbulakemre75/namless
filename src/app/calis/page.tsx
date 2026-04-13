@@ -87,8 +87,26 @@ function CalisPageInner() {
   const recordMutation = trpc.learning.recordStudyTime.useMutation();
   const updateMasteryMutation = trpc.learning.updateMasteryFromReview.useMutation();
   const kategorizeHataMutation = trpc.learning.kategorizeHata.useMutation();
-  const [aiAnalysis, setAiAnalysis] = useState<{ aciklama: string; hataKategorisi: string; oneri: string } | null>(null);
+  const smartSolverMutation = trpc.learning.runSmartSolver.useMutation();
+  const [aiAnalysis, setAiAnalysis] = useState<{ aciklama: string; hataKategorisi: string; oneri: string; adimlar?: string[] } | null>(null);
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
+
+  // Smart solver sonucu gelince state'e yaz
+  useEffect(() => {
+    if (smartSolverMutation.data) {
+      const d = smartSolverMutation.data;
+      setAiAnalysis({
+        aciklama: d.aciklama,
+        hataKategorisi: d.hataKategorisi,
+        oneri: d.oneri,
+        adimlar: d.adimlar,
+      });
+      setAiAnalysisLoading(false);
+    }
+    if (smartSolverMutation.isError) {
+      setAiAnalysisLoading(false);
+    }
+  }, [smartSolverMutation.data, smartSolverMutation.isError]);
 
   const sorular = adaptifData?.sorular ?? [];
 
@@ -144,10 +162,11 @@ function CalisPageInner() {
 
     if (!sonuc.dogruMu) {
       setHataKategoriSecimi(`${soruIdx}`);
-      // AI analiz başlat
+      // Smart solver analizi başlat
       if (sonuc.attemptId) {
         setAiAnalysisLoading(true);
         setAiAnalysis(null);
+        smartSolverMutation.mutate({ attemptId: sonuc.attemptId });
       }
     }
 
@@ -453,11 +472,16 @@ function CalisPageInner() {
                 </div>
               )}
               {!cevapSonuc.dogruMu && aiAnalysis && (
-                <div className="mt-3 pt-3 border-t border-orange-200">
-                  <p className="text-xs font-semibold text-orange-800 mb-1">AI Analiz:</p>
+                <div className="mt-3 pt-3 border-t border-orange-200 space-y-2">
+                  <p className="text-xs font-semibold text-orange-800">AI Analiz ({aiAnalysis.hataKategorisi?.replace("_", " ")}):</p>
                   <p className="text-xs text-orange-700">{aiAnalysis.aciklama}</p>
+                  {aiAnalysis.adimlar && aiAnalysis.adimlar.length > 0 && (
+                    <ol className="text-xs text-orange-700 space-y-0.5 list-decimal list-inside">
+                      {aiAnalysis.adimlar.map((a, i) => <li key={i}>{a}</li>)}
+                    </ol>
+                  )}
                   {aiAnalysis.oneri && (
-                    <p className="text-xs text-orange-600 mt-1 italic">{aiAnalysis.oneri}</p>
+                    <p className="text-xs text-orange-600 italic">{aiAnalysis.oneri}</p>
                   )}
                 </div>
               )}
