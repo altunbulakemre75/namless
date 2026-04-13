@@ -85,9 +85,6 @@ export default function RegisterPage() {
     setBasarili(true);
     setYukleniyor(false);
 
-    // Diagnostic sonuclarini temizle
-    localStorage.removeItem("lgs_diagnostic_result");
-
     setTimeout(() => router.push("/auth/login"), 2000);
   };
 

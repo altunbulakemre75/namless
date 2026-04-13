@@ -20,8 +20,9 @@ export default function AuthCallbackPage() {
           await transferMutation.mutateAsync({ cevaplar: data.cevaplar });
           localStorage.removeItem("lgs_diagnostic_result");
           setDurum("Çalışma planın oluşturuldu! Yönlendiriliyorsun...");
-        } catch {
-          // Transfer basarisiz — direkt dashboard'a git
+        } catch (err) {
+          console.error("Diagnostic transfer hatası:", err);
+          setDurum("Plan oluşturulamadı, dashboard'a yönlendiriliyorsun...");
         }
       }
       setTimeout(() => router.push("/dashboard"), 1000);

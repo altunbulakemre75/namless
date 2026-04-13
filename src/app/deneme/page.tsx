@@ -10,7 +10,7 @@ const DERS_ISIM: Record<string, string> = {
 };
 
 interface Soru {
-  id: string; ders: string; konuIsim: string; soruMetni: string; siklar: string[]; zorluk: number;
+  id: string; ders: string; konuIsim: string; soruMetni: string; siklar: string[]; zorluk: number; dogruSik: number;
 }
 
 export default function DenemePage() {
@@ -75,19 +75,15 @@ export default function DenemePage() {
       if (!dersSkr[soru.ders]) dersSkr[soru.ders] = { dogru: 0, toplam: 0 };
       dersSkr[soru.ders].toplam++;
 
-      if (cevap === undefined) { bos++; }
-      else {
-        // dogruSik bilgisi yok, basit hesap
-        // Gercek implementasyonda server-side kontrol yapilir
+      if (cevap === undefined) {
+        bos++;
+      } else if (cevap === soru.dogruSik) {
+        dogru++;
+        dersSkr[soru.ders].dogru++;
+      } else {
         yanlis++;
-        dersSkr[soru.ders].dogru += 0;
       }
     });
-
-    // dogru sayisini cevaplar uzerinden hesapla (simdilik tumu yanlis say)
-    // Gercek versiyonda server'a gonderilecek
-    dogru = Math.floor(sorular.length * 0.5); // placeholder
-    yanlis = sorular.length - dogru - bos;
 
     setDersSkorlar(dersSkr);
 
@@ -104,6 +100,9 @@ export default function DenemePage() {
       } catch {
         setSonuc({ net: dogru - yanlis / 3, kocYorumu: "Giriş yaparak detaylı analiz alabilirsin." });
       }
+    } else {
+      // examId yoksa (auth hatasi) yerel hesapla
+      setSonuc({ net: dogru - yanlis / 3, kocYorumu: "Giriş yaparak detaylı analiz alabilirsin." });
     }
 
     setMod("sonuc");
@@ -183,7 +182,20 @@ export default function DenemePage() {
 
   // Sinav ekrani
   const soru = sorular[mevcutIdx];
-  if (!soru) return null;
+  if (!soru) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 text-center max-w-md">
+          <p className="text-4xl mb-3">🔒</p>
+          <h2 className="text-xl font-bold mb-2">Giriş Gerekli</h2>
+          <p className="text-gray-500 mb-6 text-sm">Deneme sınavını kullanmak için giriş yapman gerekiyor.</p>
+          <Link href="/auth/login" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700">
+            Giriş Yap
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const dakika = Math.floor(kalanSaniye / 60);
   const saniye = kalanSaniye % 60;

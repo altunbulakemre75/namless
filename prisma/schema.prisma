@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ==================== IDENTITY CONTEXT ====================
@@ -39,16 +40,22 @@ model User {
   targetSchool       School?          @relation(fields: [targetSchoolId], references: [id])
   dailyStudyMins     Int              @default(60)
   estimatedReadyDate DateTime?
-  // Sprint 6: Streak
+  // Streak
   currentStreak      Int              @default(0)
   longestStreak      Int              @default(0)
   lastStudyDate      DateTime?
+  // Sure takibi
+  dailyActiveMinutes  Int             @default(0)
+  weeklyActiveMinutes Int             @default(0)
+  lastActiveDate      DateTime?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   attempts           Attempt[]
   masteries          Mastery[]
   studyPlans         StudyPlan[]
   mockExams          MockExam[]
+  studySessions      StudySession[]
+  subscriptions      Subscription[]
 
   @@map("users")
 }
@@ -78,11 +85,15 @@ model Topic {
   zorlukOrta      Float      @default(0.34)
   zorlukZor       Float      @default(0.33)
   tarihselAgirlik Float      @default(0)
-  // Sprint 3: Icerik
+  // Icerik
   videoUrl        String?
-  dersIcerigi     String?    // AI veya manuel metin icerik
+  dersIcerigi     String?
+  pdfUrl          String?    // Supabase Storage PDF URL
+  aiAnlatim       String?    // Claude tarafindan uretilen konu anlatimi (cache)
+  aiAnlatimTarihi DateTime?  // Son uretim tarihi
   questions       Question[]
   masteries       Mastery[]
+  kitapMetinleri  KitapMetni[]
 
   @@map("topics")
 }
@@ -219,7 +230,7 @@ model School {
   sehir     String
   ilce      String?
   minPuan   Float    // taban puan
-  tur       String   @default("Anadolu Lisesi") // Fen, Anadolu, Sosyal Bilimler
+  tur       String   @default("Anadolu Lisesi")
   createdAt DateTime @default(now())
   users     User[]
 
@@ -242,9 +253,72 @@ model MockExam {
   bosSayisi     Int      @default(0)
   netPuan       Float    @default(0)
   stressModu    Boolean  @default(false)
-  kocYorumu     String?  // AI analizi
-  attemptIds    String[] // iliskili attempt id'leri
+  kocYorumu     String?
+  attemptIds    String[]
 
   @@index([userId])
   @@map("mock_exams")
+}
+
+// ==================== STUDY SESSION (Sure Takibi) ====================
+
+enum StudySessionTip {
+  KONU
+  SORU
+  DENEME
+}
+
+model StudySession {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  topicId   String?
+  tip       StudySessionTip
+  sureDk    Int
+  tarih     DateTime         @default(now())
+
+  @@index([userId, tarih])
+  @@map("study_sessions")
+}
+
+// ==================== KITAP BİLGİ TABANI ====================
+
+model KitapMetni {
+  id          String   @id @default(uuid())
+  kaynak      String   // "8matcalisma.pdf"
+  ders        Ders
+  bolum       String   // "Denklemler ve Eşitsizlikler"
+  icerik      String   @db.Text
+  sayfaAralik String?  // "45-52"
+  topicId     String?
+  topic       Topic?   @relation(fields: [topicId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([ders])
+  @@index([topicId])
+  @@map("kitap_metinleri")
+}
+
+// ==================== SUBSCRIPTION (Abonelik) ====================
+
+enum SubscriptionDurum {
+  AKTIF
+  IPTAL
+  SURESI_DOLDU
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id])
+  plan        SubscriptionTier
+  durum       SubscriptionDurum  @default(AKTIF)
+  baslangic   DateTime           @default(now())
+  bitis       DateTime?
+  iyzicoId    String?
+  ucret       Float              @default(0)
+  createdAt   DateTime           @default(now())
+
+  @@index([userId])
+  @@map("subscriptions")
 }

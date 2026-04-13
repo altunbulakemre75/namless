@@ -24,7 +24,13 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setHata("E-posta veya şifre hatalı.");
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setHata("E-posta adresin henüz doğrulanmamış. Gelen kutunu kontrol et.");
+      } else if (error.message.toLowerCase().includes("invalid login credentials")) {
+        setHata("E-posta veya şifre hatalı.");
+      } else {
+        setHata("Giriş yapılamadı: " + error.message);
+      }
       setYukleniyor(false);
       return;
     }
@@ -32,7 +38,6 @@ export default function LoginPage() {
     // Diagnostic sonucu varsa callback'e yonlendir (DB'ye aktar)
     const hasDiagnostic = localStorage.getItem("lgs_diagnostic_result");
     router.push(hasDiagnostic ? "/auth/callback" : "/dashboard");
-    router.refresh();
   };
 
   return (

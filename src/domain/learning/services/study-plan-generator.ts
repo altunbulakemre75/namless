@@ -52,13 +52,16 @@ export class StudyPlanGenerator {
         Math.floor(soruSayisi / Math.max(bugunKonular.length, 1))
       );
 
-      sessions.push({
-        tarih,
-        hedefTopicIds: bugunKonular.map((m) => m.topicId),
-        tahminiSure: bugunKonular.length * topicBasiSoru * SORU_BASI_DAKIKA,
-        durum: SessionDurum.PENDING,
-        gercekAttemptIds: [],
-      });
+      // Boş gün oluşturma — en az 1 konu olan günleri kaydet
+      if (bugunKonular.length > 0) {
+        sessions.push({
+          tarih,
+          hedefTopicIds: bugunKonular.map((m) => m.topicId),
+          tahminiSure: bugunKonular.length * topicBasiSoru * SORU_BASI_DAKIKA,
+          durum: SessionDurum.PENDING,
+          gercekAttemptIds: [],
+        });
+      }
     }
 
     return {
@@ -109,6 +112,10 @@ export class StudyPlanGenerator {
   ): Omit<StudyPlan, "id"> {
     const bugun = new Date();
     bugun.setHours(0, 0, 0, 0);
+
+    if (masteries.length === 0) {
+      return { userId, hedefTarih, gunlukDakika, planVersiyonu: 1, sessions: [], olusturmaTarihi: new Date() };
+    }
 
     const sessions: DailySession[] = Array.from({ length: gunSayisi }, (_, i) => {
       const tarih = new Date(bugun);

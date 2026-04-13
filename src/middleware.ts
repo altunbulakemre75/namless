@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_ROUTES = ["/", "/auth/login", "/auth/register", "/auth/callback", "/diagnostic", "/konular"];
+const PUBLIC_ROUTES = ["/", "/auth/login", "/auth/register", "/auth/callback", "/diagnostic", "/konular", "/api/health", "/api/test-bad-student", "/api/test-system"];
+const ADMIN_ROUTES = ["/admin"];
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -40,6 +41,12 @@ export async function middleware(request: NextRequest) {
 
   if (user && (pathname === "/auth/login" || pathname === "/auth/register")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Admin route koruması — sadece ADMIN kullanıcılar (tRPC middleware de kontrol eder)
+  const isAdmin = ADMIN_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  if (isAdmin && !user) {
+    return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
   return supabaseResponse;

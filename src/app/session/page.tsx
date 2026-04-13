@@ -47,6 +47,7 @@ export default function SessionPage() {
 
   const { data: session, isLoading } = trpc.assessment.getTodaySession.useQuery();
   const submitMutation = trpc.assessment.submitAnswer.useMutation();
+  const completeMutation = trpc.assessment.completeSession.useMutation();
 
   const sorular: Soru[] = session?.questions ?? [];
   const soru = sorular[mevcutIdx];
@@ -67,8 +68,16 @@ export default function SessionPage() {
     if (sonuc.dogruMu) setDogru((d) => d + 1);
   };
 
-  const sonraki = () => {
+  const sonraki = async () => {
     if (mevcutIdx + 1 >= sorular.length) {
+      // Session'i DONE yap ve streak'i guncelle
+      if (session?.sessionId) {
+        try {
+          await completeMutation.mutateAsync({ sessionId: session.sessionId });
+        } catch {
+          // Hata olsa bile UI'i goster
+        }
+      }
       setBitmis(true);
     } else {
       setMevcutIdx((i) => i + 1);

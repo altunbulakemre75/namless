@@ -2,32 +2,26 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { trpc } from "../../lib/trpc";
+import { createClient } from "../../lib/supabase/client";
 
 const DERS_ISIM: Record<string, string> = {
   MATEMATIK: "Matematik",
   FEN: "Fen Bilimleri",
   TURKCE: "Türkçe",
-  SOSYAL: "Sosyal Bilgiler",
-  INGILIZCE: "İngilizce",
-  DIN: "Din Kültürü",
 };
 
 const DERS_RENK: Record<string, string> = {
   MATEMATIK: "border-blue-400 bg-blue-50 hover:bg-blue-100",
   FEN: "border-green-400 bg-green-50 hover:bg-green-100",
   TURKCE: "border-red-400 bg-red-50 hover:bg-red-100",
-  SOSYAL: "border-yellow-400 bg-yellow-50 hover:bg-yellow-100",
-  INGILIZCE: "border-purple-400 bg-purple-50 hover:bg-purple-100",
-  DIN: "border-orange-400 bg-orange-50 hover:bg-orange-100",
 };
 
 const DERS_IKON: Record<string, string> = {
   MATEMATIK: "📐",
   FEN: "🔬",
   TURKCE: "📖",
-  SOSYAL: "🏛️",
-  INGILIZCE: "🌍",
-  DIN: "☪️",
 };
 
 interface Soru {
@@ -54,29 +48,49 @@ interface CevapSonuc {
 }
 
 export default function DiagnosticClient({ sorular, secilenDers, modSecim }: Props) {
+  const router = useRouter();
   const [mevcutIdx, setMevcutIdx] = useState(0);
   const [secilenSik, setSecilenSik] = useState<number | null>(null);
   const [cevapSonuc, setCevapSonuc] = useState<CevapSonuc | null>(null);
   const [dogru, setDogru] = useState(0);
   const [bitmis, setBitmis] = useState(false);
   const [dersSkorlar, setDersSkorlar] = useState<Record<string, { dogru: number; toplam: number }>>({});
-  // Her soru cevabini kaydet (kayit sonrasi DB'ye aktarilacak)
   const [cevaplar, setCevaplar] = useState<Array<{ questionId: string; secilenSik: number; dogruMu: boolean; ders: string; konuIsim: string }>>([]);
+  const [girisDurumu, setGirisDurumu] = useState<"kontrol" | "giris" | "misafir">("kontrol");
+  const [planOlusturuluyor, setPlanOlusturuluyor] = useState(false);
+  const transferMutation = trpc.learning.transferDiagnostic.useMutation();
 
   const soru = sorular[mevcutIdx];
 
-  // Sonuclari localStorage'a kaydet (kayit olmadan ciksa bile korunsun)
+  // Test bitince: localStorage'a kaydet + auth durumunu kontrol et
   useEffect(() => {
-    if (bitmis && cevaplar.length > 0) {
-      localStorage.setItem("lgs_diagnostic_result", JSON.stringify({
-        cevaplar,
-        dersSkorlar,
-        tarih: new Date().toISOString(),
-        toplamDogru: dogru,
-        toplamSoru: sorular.length,
-      }));
-    }
+    if (!bitmis || cevaplar.length === 0) return;
+
+    localStorage.setItem("lgs_diagnostic_result", JSON.stringify({
+      cevaplar,
+      dersSkorlar,
+      tarih: new Date().toISOString(),
+      toplamDogru: dogru,
+      toplamSoru: sorular.length,
+    }));
+
+    // Kullanici zaten giris yapmis mi?
+    createClient().auth.getUser().then(({ data }) => {
+      setGirisDurumu(data.user ? "giris" : "misafir");
+    });
   }, [bitmis, cevaplar, dersSkorlar, dogru, sorular.length]);
+
+  const planOlustur = async () => {
+    setPlanOlusturuluyor(true);
+    try {
+      await transferMutation.mutateAsync({ cevaplar });
+      localStorage.removeItem("lgs_diagnostic_result");
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Plan oluşturulamadı:", err);
+      setPlanOlusturuluyor(false);
+    }
+  };
 
   // ==================== DERS SECIM EKRANI ====================
   if (modSecim) {
@@ -212,27 +226,40 @@ export default function DiagnosticClient({ sorular, secilenDers, modSecim }: Pro
           })()}
 
           <div className="flex flex-col gap-3">
-            <Link
-              href="/auth/register"
-              className="block text-center bg-blue-600 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-700 transition-colors text-lg"
-            >
-              Kayıt Ol → Çalışma Planını Al
-            </Link>
-            <p className="text-center text-xs text-gray-400">Deneme sonuçların kaydedildi. Kayıt olduğunda otomatik çalışma planın oluşturulacak.</p>
-            <div className="flex gap-3 mt-1">
-              <Link
-                href="/diagnostic"
-                className="flex-1 text-center border border-gray-300 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+            {girisDurumu === "giris" ? (
+              <button
+                onClick={planOlustur}
+                disabled={planOlusturuluyor}
+                className="block w-full text-center bg-blue-600 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-700 transition-colors text-lg disabled:opacity-50"
               >
-                Tekrar Dene
-              </Link>
-              <Link
-                href="/auth/login"
-                className="flex-1 text-center border border-blue-300 text-blue-700 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-50 transition-colors"
-              >
-                Zaten Üyeyim
-              </Link>
-            </div>
+                {planOlusturuluyor ? "Plan oluşturuluyor..." : "Çalışma Planımı Oluştur →"}
+              </button>
+            ) : girisDurumu === "misafir" ? (
+              <>
+                <Link
+                  href="/auth/register"
+                  className="block text-center bg-blue-600 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-700 transition-colors text-lg"
+                >
+                  Kayıt Ol → Çalışma Planını Al
+                </Link>
+                <div className="flex gap-3">
+                  <Link
+                    href="/diagnostic"
+                    className="flex-1 text-center border border-gray-300 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Tekrar Dene
+                  </Link>
+                  <Link
+                    href="/auth/login"
+                    className="flex-1 text-center border border-blue-300 text-blue-700 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-50 transition-colors"
+                  >
+                    Zaten Üyeyim
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-gray-400 text-sm py-3">Kontrol ediliyor...</div>
+            )}
           </div>
         </div>
       </div>

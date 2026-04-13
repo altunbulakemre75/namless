@@ -1,7 +1,7 @@
 import { prisma } from "../../infrastructure/database/prisma";
 import DiagnosticClient from "./diagnostic-client";
 
-const GECERLI_DERSLER = ["MATEMATIK", "FEN", "TURKCE", "SOSYAL", "INGILIZCE", "DIN"];
+const GECERLI_DERSLER = ["MATEMATIK", "FEN", "TURKCE"];
 
 interface Props {
   searchParams: Promise<{ ders?: string }>;
@@ -38,7 +38,8 @@ export default async function DiagnosticPage({ searchParams }: Props) {
   });
 
   const secilen: typeof tumSorular = [];
-  const maxPerDers = ders ? 20 : 5;
+  // Genel modda her dersten 2 soru (3 ders × 2 = 6), tek ders modunda 20
+  const maxPerDers = ders ? 20 : 2;
 
   dersGruplari.forEach((sorular) => {
     const karistir = [...sorular].sort(() => Math.random() - 0.5);

@@ -4,9 +4,6 @@ const dersler = [
   { isim: "Matematik", key: "MATEMATIK", ikon: "📐", renk: "bg-blue-500", soru: 20 },
   { isim: "Fen Bilimleri", key: "FEN", ikon: "🔬", renk: "bg-green-500", soru: 20 },
   { isim: "Türkçe", key: "TURKCE", ikon: "📖", renk: "bg-red-500", soru: 20 },
-  { isim: "Sosyal Bilgiler", key: "SOSYAL", ikon: "🏛️", renk: "bg-yellow-500", soru: 10 },
-  { isim: "İngilizce", key: "INGILIZCE", ikon: "🌍", renk: "bg-purple-500", soru: 10 },
-  { isim: "Din Kültürü", key: "DIN", ikon: "☪️", renk: "bg-orange-500", soru: 10 },
 ];
 
 export default function Home() {

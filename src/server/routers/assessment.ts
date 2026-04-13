@@ -13,7 +13,7 @@ export const assessmentRouter = router({
     const questions = await ctx.prisma.question.findMany({
       where: { validationStatus: "PUBLISHED" },
       include: { topic: true },
-      take: 30,
+      take: 5,
     });
 
     // Ders bazinda dengeli dagitim
@@ -40,6 +40,19 @@ export const assessmentRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+
+      // Prisma User satiri yoksa olustur
+      await ctx.prisma.user.upsert({
+        where: { id: userId },
+        update: {},
+        create: {
+          id: userId,
+          email: ctx.user.email!,
+          isim: (ctx.user.user_metadata?.isim as string | undefined) ?? "Öğrenci",
+        },
+      });
+
       const question = await ctx.prisma.question.findUniqueOrThrow({
         where: { id: input.questionId },
       });
@@ -68,6 +81,17 @@ export const assessmentRouter = router({
   // Diagnostic bitti — mastery hesapla + plan uret
   completeDiagnostic: protectedProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.user.id;
+
+    // Prisma User satiri yoksa olustur
+    await ctx.prisma.user.upsert({
+      where: { id: userId },
+      update: {},
+      create: {
+        id: userId,
+        email: ctx.user.email!,
+        isim: (ctx.user.user_metadata?.isim as string | undefined) ?? "Öğrenci",
+      },
+    });
 
     // Son diagnostic attempt'leri getir
     const attempts = await ctx.prisma.attempt.findMany({
@@ -129,7 +153,11 @@ export const assessmentRouter = router({
     });
 
     // Eski plani sil, yenisini kaydet
-    await ctx.prisma.studyPlan.deleteMany({ where: { userId } });
+    const eskiPlanlar = await ctx.prisma.studyPlan.findMany({ where: { userId }, select: { id: true } });
+    if (eskiPlanlar.length > 0) {
+      await ctx.prisma.dailySession.deleteMany({ where: { studyPlanId: { in: eskiPlanlar.map(p => p.id) } } });
+      await ctx.prisma.studyPlan.deleteMany({ where: { userId } });
+    }
     await ctx.prisma.studyPlan.create({
       data: {
         userId,
@@ -173,6 +201,60 @@ export const assessmentRouter = router({
     });
   }),
 
+  // Session tamamla: durum DONE yap + streak guncelle
+  completeSession: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+
+      // Session'i DONE'a cevir
+      await ctx.prisma.dailySession.update({
+        where: { id: input.sessionId },
+        data: { durum: "DONE" },
+      });
+
+      // Streak guncelle
+      const user = await ctx.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+      });
+
+      const bugun = new Date();
+      bugun.setHours(0, 0, 0, 0);
+      const dun = new Date(bugun);
+      dun.setDate(dun.getDate() - 1);
+
+      let yeniStreak = user.currentStreak;
+
+      if (user.lastStudyDate) {
+        const sonCalismaTarihi = new Date(user.lastStudyDate);
+        sonCalismaTarihi.setHours(0, 0, 0, 0);
+
+        if (sonCalismaTarihi.getTime() === bugun.getTime()) {
+          // Bugun zaten calisildiysa streak degismesin
+          yeniStreak = user.currentStreak;
+        } else if (sonCalismaTarihi.getTime() === dun.getTime()) {
+          yeniStreak = user.currentStreak + 1;
+        } else {
+          yeniStreak = 1; // seri kirildi
+        }
+      } else {
+        yeniStreak = 1;
+      }
+
+      const enUzun = Math.max(yeniStreak, user.longestStreak);
+
+      await ctx.prisma.user.update({
+        where: { id: userId },
+        data: {
+          currentStreak: yeniStreak,
+          longestStreak: enUzun,
+          lastStudyDate: new Date(),
+        },
+      });
+
+      return { streak: yeniStreak, enUzun };
+    }),
+
   // Bugunun oturumu
   getTodaySession: protectedProcedure.query(async ({ ctx }) => {
     const plan = await ctx.prisma.studyPlan.findFirst({
@@ -210,6 +292,7 @@ export const assessmentRouter = router({
       sessionId: session.id,
       tarih: session.tarih,
       tahminiSure: session.tahminiSure,
+      hedefTopicIds: session.hedefTopicIds,
       questions: questions
         .sort(() => Math.random() - 0.5)
         .map((q) => ({
