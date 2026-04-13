@@ -89,6 +89,15 @@ Config: `config/kitap-map.json` (dosya → ders eşlemesi)
 
 ---
 
+## Geliştirme İlkeleri (Karpathy-style)
+
+1. **Basit tut** — Tek sorumluluk. Her fonksiyon bir iş yapar, test edilebilir olsun.
+2. **Kademeli geliştir** — Her PR çalışan bir şey ekler. Broken state'de commit yok.
+3. **Hata mesajları birinci sınıf** — Belirsiz "bir hata oluştu" yok; kullanıcı ne yapacağını bilmeli.
+4. **AI fallback her zaman var** — API key yoksa, rate limit varsa, timeout'ta → deterministik fallback döner, asla crash olmaz.
+
+---
+
 ## Geliştirme Notları
 
 - `prisma generate` çalıştırmadan yeni schema alanları `as any` cast gerektirir

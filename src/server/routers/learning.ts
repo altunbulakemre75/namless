@@ -5,6 +5,9 @@ import { StudyPlanGenerator } from "../../domain/learning/services/study-plan-ge
 import { AttemptBaglam } from "../../domain/assessment/entities/attempt";
 import { processDiagnostic } from "../../domain/assessment/services/diagnostic-processor";
 import { searchRelevantContent } from "../../infrastructure/rag/search";
+import { hybridSearch, formatChunksForPrompt } from "../../infrastructure/rag/hybrid-search";
+import { analyzeWithSmartSolver } from "../../infrastructure/ai/smart-solver";
+import { predictMastery } from "../../infrastructure/ai/mastery-predictor";
 import {
   generatePersonalizedLesson,
   analyzeWrongAnswer,
@@ -930,6 +933,110 @@ export const learningRouter = router({
       const provider = new StudentMemoryProvider(ctx.prisma);
       await provider.syncAfterSession(ctx.user.id, input);
       return { basarili: true };
+    }),
+
+  // ==================== SMART SOLVER (DeepTutor çift döngü) ====================
+
+  getSmartSolverAnalysis: protectedProcedure
+    .input(z.object({ attemptId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const attempt = await ctx.prisma.attempt.findUniqueOrThrow({
+        where: { id: input.attemptId },
+        include: { question: { include: { topic: true } } },
+      });
+
+      if (attempt.userId !== userId) throw new Error("Yetkisiz erişim");
+      if (attempt.dogruMu) return null;
+
+      const mastery = await ctx.prisma.mastery.findUnique({
+        where: { userId_topicId: { userId, topicId: attempt.question.topicId } },
+      });
+
+      const result = await analyzeWithSmartSolver({
+        soruMetni: attempt.question.soruMetni,
+        siklar: attempt.question.siklar,
+        dogruSik: attempt.question.dogruSik,
+        secilenSik: attempt.secilenSik,
+        masterySkoru: mastery?.skor ?? 30,
+      });
+
+      // Hata kategorisini kaydet
+      const gecerliKatlar = ["KAVRAM_EKSIK", "DIKKATSIZLIK", "KONU_ATLAMA", "ZAMAN_BASKISI"];
+      if (gecerliKatlar.includes(result.hataKategorisi)) {
+        await ctx.prisma.attempt.update({
+          where: { id: input.attemptId },
+          data: { hataKategorisi: result.hataKategorisi as "KAVRAM_EKSIK" | "DIKKATSIZLIK" | "KONU_ATLAMA" | "ZAMAN_BASKISI" },
+        });
+      }
+
+      return result;
+    }),
+
+  // ==================== MASTERY TAHMİN (Kronos lineer regresyon) ====================
+
+  getMasteryPrediction: protectedProcedure
+    .input(z.object({ topicId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+
+      // Son 60 günlük mastery geçmişi — attempt verilerinden hesapla
+      const altmisGunOnce = new Date(Date.now() - 60 * 86400000);
+      const attempts = await ctx.prisma.attempt.findMany({
+        where: { userId, question: { topicId: input.topicId }, tarih: { gte: altmisGunOnce } },
+        orderBy: { tarih: "asc" },
+        select: { dogruMu: true, tarih: true },
+      });
+
+      // Haftalık mastery tahmini hesapla (günlük grup)
+      const gunlukGrup = new Map<string, { dogru: number; toplam: number }>();
+      for (const a of attempts) {
+        const tarihStr = a.tarih.toISOString().slice(0, 10);
+        if (!gunlukGrup.has(tarihStr)) gunlukGrup.set(tarihStr, { dogru: 0, toplam: 0 });
+        const g = gunlukGrup.get(tarihStr)!;
+        g.toplam++;
+        if (a.dogruMu) g.dogru++;
+      }
+
+      const dataPoints = [...gunlukGrup.entries()].map(([tarihStr, g]) => ({
+        tarih: new Date(tarihStr),
+        skor: Math.round((g.dogru / g.toplam) * 100),
+      }));
+
+      const mastery = await ctx.prisma.mastery.findUnique({
+        where: { userId_topicId: { userId, topicId: input.topicId } },
+      });
+
+      const prediction = predictMastery(dataPoints, mastery?.skor ?? undefined);
+      return { ...prediction, topicId: input.topicId };
+    }),
+
+  // Hibrit RAG arama (gelişmiş)
+  getHybridContent: protectedProcedure
+    .input(z.object({ topicId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const topic = await ctx.prisma.topic.findUniqueOrThrow({
+        where: { id: input.topicId },
+        select: { isim: true, ders: true },
+      });
+      const mastery = await ctx.prisma.mastery.findUnique({
+        where: { userId_topicId: { userId, topicId: input.topicId } },
+      });
+
+      const chunks = await hybridSearch(ctx.prisma, {
+        topicId: input.topicId,
+        topicIsim: topic.isim,
+        ders: topic.ders,
+        masterySkoru: mastery?.skor ?? 50,
+        limit: 5,
+      });
+
+      return {
+        chunks,
+        formattedText: formatChunksForPrompt(chunks),
+        kaynak: chunks.length > 0 ? "kitap" : "yok",
+      };
     }),
 
   // Konu detayi

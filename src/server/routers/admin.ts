@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../trpc";
+import { generateQuestions } from "../../infrastructure/ai/question-generator";
 
 // Admin middleware: Prisma'dan rol kontrolü
 const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
@@ -253,7 +254,7 @@ export const adminRouter = router({
       return { basarili: true };
     }),
 
-  // AI soru üretimi (stub — gerçek AI bağlantısı sonra)
+  // AI soru üretimi — DeepTutor QGen entegrasyonu
   generateAIQuestion: adminProcedure
     .input(
       z.object({
@@ -268,29 +269,42 @@ export const adminRouter = router({
         select: { isim: true, ders: true, kazanimlar: true },
       });
 
-      // TODO: Gerçek AI entegrasyonu (claude-3-haiku)
-      // Şimdilik örnek soru üret
-      const ornekSoru = {
-        topicId: input.topicId,
-        kaynak: "AI_URETIM" as const,
-        zorluk: input.zorluk,
-        soruMetni: `[AI TASLAK] ${topic.isim} konusuyla ilgili soru ${Date.now()}`,
-        siklar: ["A şıkkı", "B şıkkı", "C şıkkı", "D şıkkı"],
-        dogruSik: 0,
-        aciklama: "AI tarafından oluşturuldu. Lütfen kontrol edin.",
-        validationStatus: "DRAFT" as const,
-        aiModel: "stub-v1",
-      };
+      const { sorular, basarisizAdet } = await generateQuestions({
+        topicIsim: topic.isim,
+        ders: topic.ders,
+        zorluk: input.zorluk as 1 | 2 | 3,
+        adet: input.adet,
+        kazanimlar: topic.kazanimlar as string[],
+      });
 
-      const olusturulanlar = [];
-      for (let i = 0; i < input.adet; i++) {
-        const soru = await ctx.prisma.question.create({ data: ornekSoru });
-        olusturulanlar.push(soru.id);
+      const olusturulanIds: string[] = [];
+
+      for (const soru of sorular) {
+        const created = await ctx.prisma.question.create({
+          data: {
+            topicId: input.topicId,
+            kaynak: "AI_URETIM",
+            zorluk: input.zorluk,
+            soruMetni: soru.soruMetni,
+            siklar: soru.siklar,
+            dogruSik: soru.dogruSik,
+            aciklama: soru.aciklama,
+            validationStatus: "DRAFT",
+            aiModel: "claude-sonnet-4-6",
+          },
+        });
+        olusturulanIds.push(created.id);
       }
 
+      const uyari = basarisizAdet > 0
+        ? `${basarisizAdet} soru üretilemedi. API key kontrolü gerekebilir.`
+        : undefined;
+
       return {
-        olusturulanIds: olusturulanlar,
-        uyari: `${topic.isim} için ${input.adet} taslak soru oluşturuldu. AI entegrasyonu henüz aktif değil — lütfen soruları manuel olarak düzenleyin.`,
+        olusturulanIds,
+        basariliAdet: sorular.length,
+        basarisizAdet,
+        uyari,
       };
     }),
 });
