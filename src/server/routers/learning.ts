@@ -3,6 +3,7 @@ import { router, publicProcedure, protectedProcedure } from "../trpc";
 import { MasteryCalculator } from "../../domain/assessment/services/mastery-calculator";
 import { StudyPlanGenerator } from "../../domain/learning/services/study-plan-generator";
 import { AttemptBaglam } from "../../domain/assessment/entities/attempt";
+import { processDiagnostic } from "../../domain/assessment/services/diagnostic-processor";
 
 const masteryCalc = new MasteryCalculator();
 const planGenerator = new StudyPlanGenerator();
@@ -49,65 +50,8 @@ export const learningRouter = router({
         });
       }
 
-      const attempts = await ctx.prisma.attempt.findMany({
-        where: { userId, baglam: "DIAGNOSTIC" },
-        include: { question: true },
-      });
-
-      const topicGroups = new Map<string, typeof attempts>();
-      attempts.forEach((a) => {
-        const tid = a.question.topicId;
-        if (!topicGroups.has(tid)) topicGroups.set(tid, []);
-        topicGroups.get(tid)!.push(a);
-      });
-
-      const masteries = [];
-      for (const [topicId, topicAttempts] of topicGroups) {
-        const domainAttempts = topicAttempts.map((a) => ({
-          id: a.id,
-          userId: a.userId,
-          questionId: a.questionId,
-          secilenSik: a.secilenSik,
-          dogruMu: a.dogruMu,
-          sureMs: a.sureMs,
-          tarih: a.tarih,
-          baglam: a.baglam as AttemptBaglam,
-        }));
-        const mastery = masteryCalc.calculate(userId, topicId, domainAttempts);
-        await ctx.prisma.mastery.upsert({
-          where: { userId_topicId: { userId, topicId } },
-          update: { skor: mastery.skor, guvenAraligi: mastery.guvenAraligi, sonGuncelleme: new Date() },
-          create: { userId, topicId, skor: mastery.skor, guvenAraligi: mastery.guvenAraligi },
-        });
-        masteries.push(mastery);
-      }
-
       const user = await ctx.prisma.user.findUnique({ where: { id: userId } });
-      const planData = planGenerator.generate({
-        userId,
-        masteries,
-        hedefTarih: LGS_TARIHI,
-        gunlukDakika: user?.dailyStudyMins ?? 60,
-      });
-
-      await ctx.prisma.studyPlan.deleteMany({ where: { userId } });
-      await ctx.prisma.studyPlan.create({
-        data: {
-          userId,
-          hedefTarih: planData.hedefTarih,
-          gunlukDakika: planData.gunlukDakika,
-          planVersiyonu: planData.planVersiyonu,
-          sessions: {
-            create: planData.sessions.slice(0, 30).map((s) => ({
-              tarih: s.tarih,
-              hedefTopicIds: s.hedefTopicIds,
-              tahminiSure: s.tahminiSure,
-              durum: s.durum,
-              attemptIds: [],
-            })),
-          },
-        },
-      });
+      const { masteries } = await processDiagnostic(ctx.prisma, userId, user?.dailyStudyMins ?? 60);
 
       return { basarili: true, masterySayisi: masteries.length };
     }),
@@ -245,13 +189,8 @@ export const learningRouter = router({
           soruMetni: q.soruMetni,
           siklar: q.siklar,
           zorluk: q.zorluk,
-          dogruSik: q.dogruSik,
+          // dogruSik client'a gönderilmiyor — server-side kontrol edilecek
         }));
-
-      const dogruSiklar: Record<string, number> = {};
-      sorular
-        .filter((q) => secilenIds.includes(q.id))
-        .forEach((q) => { dogruSiklar[q.id] = q.dogruSik; });
 
       return {
         examId: exam.id,
@@ -259,25 +198,47 @@ export const learningRouter = router({
         toplamSoru: secilenIds.length,
         sureDakika: input.stressModu ? Math.ceil(secilenIds.length * 1.5) : 0,
         sorular: secilenSorular,
-        dogruSiklar,
       };
     }),
 
-  // Sprint 6: Deneme sinavi bitir + koc yorumu
+  // Sprint 6: Deneme sinavi bitir + koc yorumu (server-side dogru/yanlis kontrolu)
   completeMockExam: protectedProcedure
     .input(
       z.object({
         examId: z.string(),
-        dogruSayisi: z.number(),
-        yanlisSayisi: z.number(),
-        bosSayisi: z.number(),
-        dersBazinda: z.record(z.string(), z.object({ dogru: z.number(), toplam: z.number() })),
+        cevaplar: z.array(z.object({
+          questionId: z.string(),
+          secilenSik: z.number().min(-1).max(3), // -1 = boş bırakıldı
+        })),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const net = input.dogruSayisi - input.yanlisSayisi / 3;
+      const userId = ctx.user.id;
+      let dogru = 0, yanlis = 0, bos = 0;
+      const dersBazinda: Record<string, { dogru: number; toplam: number }> = {};
 
-      const zayifDersler = Object.entries(input.dersBazinda)
+      for (const cevap of input.cevaplar) {
+        const soru = await ctx.prisma.question.findUniqueOrThrow({
+          where: { id: cevap.questionId },
+          include: { topic: { select: { ders: true } } },
+        });
+        const ders = soru.topic.ders;
+        if (!dersBazinda[ders]) dersBazinda[ders] = { dogru: 0, toplam: 0 };
+        dersBazinda[ders].toplam++;
+
+        if (cevap.secilenSik === -1) {
+          bos++;
+        } else {
+          const dogruMu = soru.dogruSik === cevap.secilenSik;
+          if (dogruMu) { dogru++; dersBazinda[ders].dogru++; } else { yanlis++; }
+          await ctx.prisma.attempt.create({
+            data: { userId, questionId: cevap.questionId, secilenSik: cevap.secilenSik, dogruMu, sureMs: 0, baglam: "MOCK_EXAM" },
+          });
+        }
+      }
+
+      const net = dogru - yanlis / 3;
+      const zayifDersler = Object.entries(dersBazinda)
         .filter(([, v]) => v.toplam > 0 && v.dogru / v.toplam < 0.5)
         .map(([ders]) => ders);
 
@@ -295,17 +256,10 @@ export const learningRouter = router({
 
       await ctx.prisma.mockExam.update({
         where: { id: input.examId },
-        data: {
-          bitisTarihi: new Date(),
-          dogruSayisi: input.dogruSayisi,
-          yanlisSayisi: input.yanlisSayisi,
-          bosSayisi: input.bosSayisi,
-          netPuan: net,
-          kocYorumu,
-        },
+        data: { bitisTarihi: new Date(), dogruSayisi: dogru, yanlisSayisi: yanlis, bosSayisi: bos, netPuan: net, kocYorumu },
       });
 
-      return { net, kocYorumu, zayifDersler };
+      return { net, kocYorumu, zayifDersler, dersBazinda };
     }),
 
   // Sprint 5: Konu listesi (serbest mod)
@@ -338,17 +292,12 @@ export const learningRouter = router({
       where: { id: ctx.user.id },
     });
     // targetSchool tablosu henuz yoksa (db push yapilmamissa) null don
-    let targetSchool: { id: string; isim: string; sehir: string; minPuan: number } | null = null;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const school = user.targetSchoolId ? await (ctx.prisma as any).school.findUnique({
-        where: { id: user.targetSchoolId },
-        select: { id: true, isim: true, sehir: true, minPuan: true },
-      }) : null;
-      targetSchool = school;
-    } catch {
-      // schools tablosu henuz olusturulmamis, null dondur
-    }
+    const targetSchool = user.targetSchoolId
+      ? await ctx.prisma.school.findUnique({
+          where: { id: user.targetSchoolId },
+          select: { id: true, isim: true, sehir: true, minPuan: true },
+        })
+      : null;
     return { ...user, targetSchool };
   }),
 
@@ -415,11 +364,15 @@ export const learningRouter = router({
       const user = await ctx.prisma.user.findUnique({ where: { id: userId } });
       const bugunMu = user?.lastActiveDate &&
         new Date(user.lastActiveDate).setHours(0,0,0,0) === bugun.getTime();
+      const haftaBasi = new Date(bugun);
+      haftaBasi.setDate(haftaBasi.getDate() - haftaBasi.getDay());
+      const haftaIciMi = user?.lastActiveDate &&
+        new Date(user.lastActiveDate) >= haftaBasi;
       await ctx.prisma.user.update({
         where: { id: userId },
         data: {
           dailyActiveMinutes: bugunMu ? { increment: input.sureDk } : input.sureDk,
-          weeklyActiveMinutes: { increment: input.sureDk },
+          weeklyActiveMinutes: haftaIciMi ? { increment: input.sureDk } : input.sureDk,
           lastActiveDate: new Date(),
         },
       });

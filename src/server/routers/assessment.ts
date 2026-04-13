@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
-import { MasteryCalculator } from "../../domain/assessment/services/mastery-calculator";
-import { StudyPlanGenerator } from "../../domain/learning/services/study-plan-generator";
-import { AttemptBaglam } from "../../domain/assessment/entities/attempt";
-
-const masteryCalc = new MasteryCalculator();
-const planGenerator = new StudyPlanGenerator();
+import { processDiagnostic } from "../../domain/assessment/services/diagnostic-processor";
 
 export const assessmentRouter = router({
   // Seviye belirleme testi sorularini getir
@@ -13,13 +8,23 @@ export const assessmentRouter = router({
     const questions = await ctx.prisma.question.findMany({
       where: { validationStatus: "PUBLISHED" },
       include: { topic: true },
-      take: 5,
     });
 
-    // Ders bazinda dengeli dagitim
-    const shuffled = questions.sort(() => Math.random() - 0.5);
+    // Ders bazinda dengeli dagitim: her dersten en fazla 5 soru
+    const dersGruplari = new Map<string, typeof questions>();
+    questions.forEach((q) => {
+      const d = q.topic.ders;
+      if (!dersGruplari.has(d)) dersGruplari.set(d, []);
+      dersGruplari.get(d)!.push(q);
+    });
 
-    return shuffled.map((q) => ({
+    const secilen: typeof questions = [];
+    dersGruplari.forEach((dsSorular) => {
+      const karisik = [...dsSorular].sort(() => Math.random() - 0.5);
+      secilen.push(...karisik.slice(0, 5));
+    });
+
+    return secilen.sort(() => Math.random() - 0.5).map((q) => ({
       id: q.id,
       ders: q.topic.ders,
       konuIsim: q.topic.isim,
@@ -60,7 +65,7 @@ export const assessmentRouter = router({
       const dogruMu = question.dogruSik === input.secilenSik;
 
       // Attempt EVENT kaydet — asla guncellenmiyor
-      await ctx.prisma.attempt.create({
+      const attempt = await ctx.prisma.attempt.create({
         data: {
           userId: ctx.user.id,
           questionId: input.questionId,
@@ -75,6 +80,7 @@ export const assessmentRouter = router({
         dogruMu,
         dogruSik: question.dogruSik,
         aciklama: question.aciklama,
+        attemptId: attempt.id,
       };
     }),
 
@@ -82,7 +88,6 @@ export const assessmentRouter = router({
   completeDiagnostic: protectedProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.user.id;
 
-    // Prisma User satiri yoksa olustur
     await ctx.prisma.user.upsert({
       where: { id: userId },
       update: {},
@@ -93,92 +98,10 @@ export const assessmentRouter = router({
       },
     });
 
-    // Son diagnostic attempt'leri getir
-    const attempts = await ctx.prisma.attempt.findMany({
-      where: { userId, baglam: "DIAGNOSTIC" },
-      include: { question: { include: { topic: true } } },
-      orderBy: { tarih: "desc" },
-      take: 50,
-    });
+    const { masteries, topicGroups } = await processDiagnostic(ctx.prisma, userId, 60);
 
-    // Topic bazinda grupla ve mastery hesapla
-    const topicGroups = new Map<string, typeof attempts>();
-    attempts.forEach((a) => {
-      const tid = a.question.topicId;
-      if (!topicGroups.has(tid)) topicGroups.set(tid, []);
-      topicGroups.get(tid)!.push(a);
-    });
-
-    // Mastery upsert
-    const masteries = [];
-    for (const [topicId, topicAttempts] of topicGroups) {
-      const domainAttempts = topicAttempts.map((a) => ({
-        id: a.id,
-        userId: a.userId,
-        questionId: a.questionId,
-        secilenSik: a.secilenSik,
-        dogruMu: a.dogruMu,
-        sureMs: a.sureMs,
-        tarih: a.tarih,
-        baglam: a.baglam as AttemptBaglam,
-      }));
-
-      const mastery = masteryCalc.calculate(userId, topicId, domainAttempts);
-
-      await ctx.prisma.mastery.upsert({
-        where: { userId_topicId: { userId, topicId } },
-        update: {
-          skor: mastery.skor,
-          guvenAraligi: mastery.guvenAraligi,
-          sonGuncelleme: mastery.sonGuncelleme,
-        },
-        create: {
-          userId,
-          topicId,
-          skor: mastery.skor,
-          guvenAraligi: mastery.guvenAraligi,
-        },
-      });
-
-      masteries.push(mastery);
-    }
-
-    // Calisma plani uret (LGS = Haziran 2025 ikinci hafta)
-    const lgsGunu = new Date("2026-06-07");
-    const planData = planGenerator.generate({
-      userId,
-      masteries,
-      hedefTarih: lgsGunu,
-      gunlukDakika: 60,
-    });
-
-    // Eski plani sil, yenisini kaydet
-    const eskiPlanlar = await ctx.prisma.studyPlan.findMany({ where: { userId }, select: { id: true } });
-    if (eskiPlanlar.length > 0) {
-      await ctx.prisma.dailySession.deleteMany({ where: { studyPlanId: { in: eskiPlanlar.map(p => p.id) } } });
-      await ctx.prisma.studyPlan.deleteMany({ where: { userId } });
-    }
-    await ctx.prisma.studyPlan.create({
-      data: {
-        userId,
-        hedefTarih: planData.hedefTarih,
-        gunlukDakika: planData.gunlukDakika,
-        planVersiyonu: planData.planVersiyonu,
-        sessions: {
-          create: planData.sessions.map((s) => ({
-            tarih: s.tarih,
-            hedefTopicIds: s.hedefTopicIds,
-            tahminiSure: s.tahminiSure,
-            durum: s.durum,
-            attemptIds: [],
-          })),
-        },
-      },
-    });
-
-    // Ozet donus
     const dersBazindaSkor = Object.fromEntries(
-      Array.from(topicGroups.entries()).map(([topicId, att]) => {
+      Array.from(topicGroups.entries()).map(([, att]) => {
         const ders = att[0].question.topic.ders;
         const dogru = att.filter((a) => a.dogruMu).length;
         return [ders, Math.round((dogru / att.length) * 100)];

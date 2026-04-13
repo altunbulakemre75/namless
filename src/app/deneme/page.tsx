@@ -10,7 +10,7 @@ const DERS_ISIM: Record<string, string> = {
 };
 
 interface Soru {
-  id: string; ders: string; konuIsim: string; soruMetni: string; siklar: string[]; zorluk: number; dogruSik: number;
+  id: string; ders: string; konuIsim: string; soruMetni: string; siklar: string[]; zorluk: number;
 }
 
 export default function DenemePage() {
@@ -66,43 +66,20 @@ export default function DenemePage() {
   const bitirir = useCallback(async () => {
     if (tamEkran) document.exitFullscreen?.();
 
-    // Sonuclari hesapla
-    const dersSkr: Record<string, { dogru: number; toplam: number }> = {};
-    let dogru = 0, yanlis = 0, bos = 0;
-
-    sorular.forEach((soru, idx) => {
-      const cevap = cevaplar.get(idx);
-      if (!dersSkr[soru.ders]) dersSkr[soru.ders] = { dogru: 0, toplam: 0 };
-      dersSkr[soru.ders].toplam++;
-
-      if (cevap === undefined) {
-        bos++;
-      } else if (cevap === soru.dogruSik) {
-        dogru++;
-        dersSkr[soru.ders].dogru++;
-      } else {
-        yanlis++;
-      }
-    });
-
-    setDersSkorlar(dersSkr);
-
     if (examId) {
       try {
-        const res = await completeMutation.mutateAsync({
-          examId,
-          dogruSayisi: dogru,
-          yanlisSayisi: yanlis,
-          bosSayisi: bos,
-          dersBazinda: dersSkr,
-        });
-        setSonuc(res);
+        const cevaplarArray = sorular.map((soru, idx) => ({
+          questionId: soru.id,
+          secilenSik: cevaplar.get(idx) ?? -1, // -1 = boş
+        }));
+        const res = await completeMutation.mutateAsync({ examId, cevaplar: cevaplarArray });
+        setDersSkorlar(res.dersBazinda);
+        setSonuc({ net: res.net, kocYorumu: res.kocYorumu });
       } catch {
-        setSonuc({ net: dogru - yanlis / 3, kocYorumu: "Giriş yaparak detaylı analiz alabilirsin." });
+        setSonuc({ net: 0, kocYorumu: "Sonuç kaydedilemedi. Lütfen tekrar deneyin." });
       }
     } else {
-      // examId yoksa (auth hatasi) yerel hesapla
-      setSonuc({ net: dogru - yanlis / 3, kocYorumu: "Giriş yaparak detaylı analiz alabilirsin." });
+      setSonuc({ net: 0, kocYorumu: "Giriş yaparak detaylı analiz alabilirsin." });
     }
 
     setMod("sonuc");

@@ -33,7 +33,7 @@ async function pdfdenAnlatimUret(
   const pdfBase64 = Buffer.from(pdfBuffer).toString("base64");
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20241022",
+    model: "claude-sonnet-4-6",
     max_tokens: 2000,
     messages: [
       {

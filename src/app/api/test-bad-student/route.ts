@@ -12,6 +12,10 @@ const TEST_EMAIL = "kotu.ogrenci@test.com";
 const LGS_TARIHI = new Date("2026-06-07");
 
 export async function GET() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_TEST_ROUTE !== "1") {
+    return NextResponse.json({ error: "Bu endpoint production'da devre dışı." }, { status: 403 });
+  }
+
   const log: string[] = [];
   const baslangic = Date.now();
 

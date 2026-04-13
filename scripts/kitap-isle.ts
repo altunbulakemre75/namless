@@ -24,7 +24,7 @@ dotenv.config({ path: path.join(__dirname, "../.env.local") });
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
 const prisma = new PrismaClient();
-const PDF_KLASORU = "C:\\Users\\altun\\Desktop\\mebkitaplar";
+const PDF_KLASORU = process.env.PDF_KLASORU ?? "C:\\Users\\altun\\Desktop\\mebkitaplar";
 const KITAP_MAP_YOLU = path.join(__dirname, "../config/kitap-map.json");
 
 type Ders = "TURKCE" | "MATEMATIK" | "FEN" | "SOSYAL" | "INGILIZCE" | "DIN";
@@ -122,7 +122,7 @@ async function visionIleSayfaOku(
   const base64 = buffer.toString("base64");
 
   const msg = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20241022",
+    model: "claude-sonnet-4-6",
     max_tokens: 4000,
     messages: [
       {
@@ -198,7 +198,7 @@ async function main() {
       const buffer = fs.readFileSync(dosyaYolu);
       const ilkSayfaMetni = await visionIleSayfaOku(anthropic, buffer, 1);
       const dersMsg = await anthropic.messages.create({
-        model: "claude-sonnet-4-5-20241022",
+        model: "claude-sonnet-4-6",
         max_tokens: 50,
         messages: [{
           role: "user",

@@ -14,7 +14,7 @@ export class ClaudeProvider implements LLMProvider {
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model: string = "claude-sonnet-4-5-20241022") {
+  constructor(apiKey: string, model: string = "claude-sonnet-4-6") {
     this.apiKey = apiKey;
     this.model = model;
   }
@@ -64,7 +64,7 @@ ${siklar.map((s, i) => `${String.fromCharCode(65 + i)}) ${s}`).join("\n")}`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20241022", // aciklama icin Haiku yeterli
+        model: "claude-haiku-4-5-20251001", // aciklama icin Haiku yeterli
         max_tokens: 512,
         messages: [{ role: "user", content: prompt }],
       }),
