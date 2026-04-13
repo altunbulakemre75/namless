@@ -18,7 +18,7 @@ interface SoruSonuc {
   hataKategori: HataKategori | null;
 }
 
-const KONU_SURE_DK = 25;
+const KONU_SURE_DK = 25; // hâlâ sure kaydı için kullanılıyor, sayaç gösterilmiyor
 
 const HATA_ETIKET: Record<HataKategori, string> = {
   DIKKATSIZLIK: "Dikkatsizlik",
@@ -240,9 +240,6 @@ function CalisPageInner() {
   }
 
   const topic = data.topic;
-  const dk = Math.floor(kalanSn / 60);
-  const sn = kalanSn % 60;
-  const ilerleme = Math.round(((KONU_SURE_DK * 60 - kalanSn) / (KONU_SURE_DK * 60)) * 100);
   const masterySkoru = adaptifData?.masterySkoru ?? data.mastery?.skor ?? null;
 
   // ======================== AŞAMA 1: KONU ========================
@@ -251,24 +248,11 @@ function CalisPageInner() {
       <div className="min-h-screen bg-indigo-50 py-8 px-4">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <Link href="/konular" className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
               ← Konular
             </Link>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-indigo-100 px-3 py-1.5 rounded-full">
-                <div className={`w-2 h-2 rounded-full ${kalanSn <= 300 ? "bg-red-500 animate-pulse" : "bg-indigo-500"}`} />
-                <span className="text-sm font-mono font-semibold text-indigo-800">
-                  {String(dk).padStart(2, "0")}:{String(sn).padStart(2, "0")}
-                </span>
-              </div>
-              <span className="text-xs text-gray-400">konu çalışması</span>
-            </div>
-          </div>
-
-          {/* Progress */}
-          <div className="w-full bg-indigo-200 rounded-full h-1.5 mb-5">
-            <div className="bg-indigo-600 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${ilerleme}%` }} />
+            <span className="text-xs text-gray-400">konu çalışması</span>
           </div>
 
           {/* Geçmiş oturum bilgisi */}

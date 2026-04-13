@@ -4,19 +4,35 @@ import Link from "next/link";
 import { useState } from "react";
 import { trpc } from "../../lib/trpc";
 
-const AKTIF_DERSLER = ["MATEMATIK", "FEN", "TURKCE"] as const;
+const AKTIF_DERSLER = ["TURKCE", "MATEMATIK", "FEN", "SOSYAL", "DIN", "INGILIZCE"] as const;
 type AktifDers = (typeof AKTIF_DERSLER)[number];
 
 const DERS_ISIM: Record<string, string> = {
-  MATEMATIK: "Matematik", FEN: "Fen Bilimleri", TURKCE: "Türkçe",
+  MATEMATIK: "Matematik",
+  FEN:       "Fen Bilimleri",
+  TURKCE:    "Türkçe",
+  SOSYAL:    "Sosyal Bilgiler",
+  DIN:       "Din Kültürü",
+  INGILIZCE: "İngilizce",
 };
 const DERS_IKON: Record<string, string> = {
-  MATEMATIK: "📐", FEN: "🔬", TURKCE: "📖",
+  MATEMATIK: "📐",
+  FEN:       "🔬",
+  TURKCE:    "📖",
+  SOSYAL:    "🌍",
+  DIN:       "☪️",
+  INGILIZCE: "🇬🇧",
+};
+const DERS_SORU: Record<string, number> = {
+  TURKCE: 20, MATEMATIK: 20, FEN: 20, SOSYAL: 10, DIN: 10, INGILIZCE: 10,
 };
 const DERS_RENK: Record<string, { card: string; bar: string; badge: string }> = {
-  MATEMATIK: { card: "border-blue-200 bg-blue-50 hover:border-blue-400", bar: "bg-blue-500", badge: "bg-blue-100 text-blue-700" },
-  FEN:       { card: "border-green-200 bg-green-50 hover:border-green-400", bar: "bg-green-500", badge: "bg-green-100 text-green-700" },
-  TURKCE:    { card: "border-red-200 bg-red-50 hover:border-red-400", bar: "bg-red-500", badge: "bg-red-100 text-red-700" },
+  MATEMATIK: { card: "border-blue-200 bg-blue-50 hover:border-blue-400",    bar: "bg-blue-500",   badge: "bg-blue-100 text-blue-700" },
+  FEN:       { card: "border-green-200 bg-green-50 hover:border-green-400",  bar: "bg-green-500",  badge: "bg-green-100 text-green-700" },
+  TURKCE:    { card: "border-red-200 bg-red-50 hover:border-red-400",        bar: "bg-red-500",    badge: "bg-red-100 text-red-700" },
+  SOSYAL:    { card: "border-orange-200 bg-orange-50 hover:border-orange-400", bar: "bg-orange-500", badge: "bg-orange-100 text-orange-700" },
+  DIN:       { card: "border-teal-200 bg-teal-50 hover:border-teal-400",     bar: "bg-teal-500",   badge: "bg-teal-100 text-teal-700" },
+  INGILIZCE: { card: "border-purple-200 bg-purple-50 hover:border-purple-400", bar: "bg-purple-500", badge: "bg-purple-100 text-purple-700" },
 };
 
 export default function KonularPage() {
@@ -180,34 +196,68 @@ export default function KonularPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Konular</h1>
         <p className="text-gray-500 mb-8">Çalışmak istediğin dersi seç.</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {AKTIF_DERSLER.map((ders) => {
-            const mastery = dersMastery[ders];
-            const renk = DERS_RENK[ders];
-            return (
-              <button
-                key={ders}
-                onClick={() => setSecilenDers(ders)}
-                className={`rounded-2xl border-2 p-6 text-left transition-all hover:shadow-md cursor-pointer ${renk.card}`}
-              >
-                <span className="text-4xl block mb-3">{DERS_IKON[ders]}</span>
-                <h2 className="text-lg font-bold text-gray-900 mb-3">{DERS_ISIM[ders]}</h2>
-                {mastery !== undefined ? (
-                  <>
-                    <div className="w-full bg-white/60 rounded-full h-2 mb-1">
-                      <div
-                        className={`h-2 rounded-full ${renk.bar}`}
-                        style={{ width: `${mastery}%` }}
-                      />
-                    </div>
-                    <p className="text-sm font-medium text-gray-600">%{mastery} tamamlandı</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-400">Henüz çalışılmadı</p>
-                )}
-              </button>
-            );
-          })}
+        {/* 1. Oturum */}
+        <div className="mb-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">1. Oturum — Sözel (50 soru)</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {(["TURKCE", "SOSYAL", "DIN", "INGILIZCE"] as const).map((ders) => {
+              const mastery = dersMastery[ders];
+              const renk = DERS_RENK[ders];
+              return (
+                <button
+                  key={ders}
+                  onClick={() => setSecilenDers(ders)}
+                  className={`rounded-2xl border-2 p-5 text-left transition-all hover:shadow-md cursor-pointer ${renk.card}`}
+                >
+                  <span className="text-3xl block mb-2">{DERS_IKON[ders]}</span>
+                  <h2 className="text-base font-bold text-gray-900 mb-1">{DERS_ISIM[ders]}</h2>
+                  <p className="text-xs text-gray-400 mb-2">{DERS_SORU[ders]} soru</p>
+                  {mastery !== undefined ? (
+                    <>
+                      <div className="w-full bg-white/60 rounded-full h-1.5 mb-1">
+                        <div className={`h-1.5 rounded-full ${renk.bar}`} style={{ width: `${mastery}%` }} />
+                      </div>
+                      <p className="text-xs font-medium text-gray-600">%{mastery}</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-400">Başlanmadı</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. Oturum */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">2. Oturum — Sayısal (40 soru)</p>
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+            {(["MATEMATIK", "FEN"] as const).map((ders) => {
+              const mastery = dersMastery[ders];
+              const renk = DERS_RENK[ders];
+              return (
+                <button
+                  key={ders}
+                  onClick={() => setSecilenDers(ders)}
+                  className={`rounded-2xl border-2 p-5 text-left transition-all hover:shadow-md cursor-pointer ${renk.card}`}
+                >
+                  <span className="text-3xl block mb-2">{DERS_IKON[ders]}</span>
+                  <h2 className="text-base font-bold text-gray-900 mb-1">{DERS_ISIM[ders]}</h2>
+                  <p className="text-xs text-gray-400 mb-2">{DERS_SORU[ders]} soru</p>
+                  {mastery !== undefined ? (
+                    <>
+                      <div className="w-full bg-white/60 rounded-full h-2 mb-1">
+                        <div className={`h-2 rounded-full ${renk.bar}`} style={{ width: `${mastery}%` }} />
+                      </div>
+                      <p className="text-sm font-medium text-gray-600">%{mastery} tamamlandı</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400">Henüz çalışılmadı</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </main>
     </div>
