@@ -124,7 +124,7 @@ async function aiAnlatimUret(
   dersIsim: string,
 ): Promise<string> {
   const message = await anthropic.messages.create({
-    model: "claude-opus-4-5",
+    model: "claude-sonnet-4-5-20241022",
     max_tokens: 2000,
     messages: [
       {

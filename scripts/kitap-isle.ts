@@ -122,7 +122,7 @@ async function visionIleSayfaOku(
   const base64 = buffer.toString("base64");
 
   const msg = await anthropic.messages.create({
-    model: "claude-opus-4-5",
+    model: "claude-sonnet-4-5-20241022",
     max_tokens: 4000,
     messages: [
       {
@@ -198,7 +198,7 @@ async function main() {
       const buffer = fs.readFileSync(dosyaYolu);
       const ilkSayfaMetni = await visionIleSayfaOku(anthropic, buffer, 1);
       const dersMsg = await anthropic.messages.create({
-        model: "claude-opus-4-5",
+        model: "claude-sonnet-4-5-20241022",
         max_tokens: 50,
         messages: [{
           role: "user",

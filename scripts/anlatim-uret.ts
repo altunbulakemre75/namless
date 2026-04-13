@@ -77,7 +77,7 @@ async function anlatimUret(
     : "\nMEB 8. sınıf müfredatına göre";
 
   const msg = await anthropic.messages.create({
-    model: "claude-opus-4-5",
+    model: "claude-sonnet-4-5-20241022",
     max_tokens: 2000,
     messages: [
       {

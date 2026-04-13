@@ -801,6 +801,10 @@ async function sA_AdminVeri(kontrol: number): Promise<TestSonuc[]> {
 // ==================== ANA HANDLER ====================
 
 export async function GET() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_TEST_ROUTE !== "1") {
+    return NextResponse.json({ error: "Bu endpoint production'da devre dışı." }, { status: 403 });
+  }
+
   const tumBaslangic = Date.now();
   const raporlar: DonguRapor[] = [];
   let toplamBasarili = 0, toplamBasarisiz = 0, toplamDuzeltme = 0;
