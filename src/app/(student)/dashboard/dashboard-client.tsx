@@ -5,12 +5,84 @@ import { useRouter } from "next/navigation";
 import { trpc } from "../../../lib/trpc";
 import { createClient } from "../../../lib/supabase/client";
 
-const DERS_RENK: Record<string, string> = {
-  MATEMATIK: "bg-blue-500", FEN: "bg-green-500", TURKCE: "bg-red-500",
+// LGS soru ağırlıkları (2026 formatı)
+const LGS_SORU_SAYISI: Record<string, number> = {
+  TURKCE:    20,
+  MATEMATIK: 20,
+  FEN:       20,
+  SOSYAL:    10,
+  DIN:       10,
+  INGILIZCE: 10,
 };
+
+const DERS_SIRA = ["TURKCE", "MATEMATIK", "FEN", "SOSYAL", "DIN", "INGILIZCE"] as const;
+
 const DERS_ISIM: Record<string, string> = {
-  MATEMATIK: "Matematik", FEN: "Fen Bilimleri", TURKCE: "Türkçe",
+  MATEMATIK: "Matematik",
+  FEN:       "Fen Bilimleri",
+  TURKCE:    "Türkçe",
+  SOSYAL:    "Sosyal Bilgiler",
+  DIN:       "Din Kültürü",
+  INGILIZCE: "İngilizce",
 };
+
+const DERS_RENK: Record<string, string> = {
+  MATEMATIK: "bg-blue-500",
+  FEN:       "bg-green-500",
+  TURKCE:    "bg-red-500",
+  SOSYAL:    "bg-orange-500",
+  DIN:       "bg-teal-500",
+  INGILIZCE: "bg-purple-500",
+};
+
+const DERS_OTURUM: Record<string, 1 | 2> = {
+  TURKCE:    1,
+  MATEMATIK: 2,
+  FEN:       2,
+  SOSYAL:    1,
+  DIN:       1,
+  INGILIZCE: 1,
+};
+
+/** LGS soru ağırlıklarına göre genel ağırlıklı ortalama */
+function calculateWeightedAverage(dersBazindaMastery: Record<string, number>): number | null {
+  const toplamAgirlik = Object.values(LGS_SORU_SAYISI).reduce((s, n) => s + n, 0);
+  let agirlikliToplam = 0;
+  let kapsanmisAgirlik = 0;
+
+  for (const [ders, soruSayisi] of Object.entries(LGS_SORU_SAYISI)) {
+    if (dersBazindaMastery[ders] !== undefined) {
+      agirlikliToplam += dersBazindaMastery[ders] * soruSayisi;
+      kapsanmisAgirlik += soruSayisi;
+    }
+  }
+
+  if (kapsanmisAgirlik === 0) return null;
+  return Math.round((agirlikliToplam / toplamAgirlik));
+}
+
+interface DersProgressBarProps {
+  ders: string;
+  skor: number;
+}
+
+function DersProgressBar({ ders, skor }: DersProgressBarProps) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-32 text-sm text-gray-600 shrink-0">{DERS_ISIM[ders] ?? ders}</span>
+      <div className="flex-1 bg-gray-100 rounded-full h-2">
+        <div
+          className={`h-2 rounded-full transition-all ${DERS_RENK[ders] ?? "bg-gray-400"}`}
+          style={{ width: `${skor}%` }}
+        />
+      </div>
+      <span className="text-xs font-medium w-8 text-right text-gray-600">%{skor}</span>
+      <span className="text-xs text-gray-400 w-16 text-right">
+        {LGS_SORU_SAYISI[ders]} soru
+      </span>
+    </div>
+  );
+}
 
 interface Props {
   userId: string;
@@ -34,38 +106,15 @@ export default function DashboardClient({ userName }: Props) {
     router.refresh();
   };
 
-  // Ders bazinda gruplama
-  const AKTIF_DERSLER = new Set(["MATEMATIK", "FEN", "TURKCE"]);
+  // Tüm 6 ders için ders bazında gruplama (filtre yok)
   const dersBazinda = masteries?.reduce((acc, m) => {
     const ders = m.topic.ders;
-    if (!AKTIF_DERSLER.has(ders)) return acc;
     if (!acc[ders]) acc[ders] = [];
     acc[ders].push(m);
     return acc;
   }, {} as Record<string, typeof masteries>) ?? {};
 
-  const aktifMasteries = masteries?.filter((m) => AKTIF_DERSLER.has(m.topic.ders)) ?? [];
-  const genelOrtalama =
-    aktifMasteries.length > 0
-      ? Math.round(aktifMasteries.reduce((s, m) => s + m.skor, 0) / aktifMasteries.length)
-      : null;
-
-  // LGS'ye kalan gun
-  const lgs = new Date("2026-06-07");
-  const kalanGun = Math.max(0, Math.ceil((lgs.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-
-  const streak = profile?.currentStreak ?? 0;
-  const hedefOkul = profile?.targetSchool;
-  const tahminiTarih = profile?.estimatedReadyDate;
-
-  // Bugünün koç döngüsü için topic
-  const bugunTopicId = todaySession?.hedefTopicIds?.[0] ?? null;
-
-  // Günlük süre
-  const bugunDk = studyStats?.gunlukDk ?? 0;
-  const haftaDk = studyStats?.haftalikDk ?? 0;
-
-  // Ders bazında mastery ortalama (masteries'ten hesapla)
+  // Ders bazında mastery ortalama — tüm dersler
   const dersBazindaMastery: Record<string, number> = {};
   if (masteries) {
     const gruplar: Record<string, number[]> = {};
@@ -78,6 +127,25 @@ export default function DashboardClient({ userName }: Props) {
       dersBazindaMastery[ders] = Math.round(skorlar.reduce((s, x) => s + x, 0) / skorlar.length);
     });
   }
+
+  // LGS ağırlıklı genel ortalama
+  const genelOrtalama = calculateWeightedAverage(dersBazindaMastery);
+
+  // LGS'ye kalan gün
+  const lgs = new Date("2026-06-07");
+  const kalanGun = Math.max(0, Math.ceil((lgs.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
+  const streak = profile?.currentStreak ?? 0;
+  const hedefOkul = profile?.targetSchool;
+  const tahminiTarih = profile?.estimatedReadyDate;
+
+  const bugunTopicId = todaySession?.hedefTopicIds?.[0] ?? null;
+  const bugunDk = studyStats?.gunlukDk ?? 0;
+  const haftaDk = studyStats?.haftalikDk ?? 0;
+
+  // 1. ve 2. oturum ayrımı
+  const oturum1 = DERS_SIRA.filter((d) => DERS_OTURUM[d] === 1);
+  const oturum2 = DERS_SIRA.filter((d) => DERS_OTURUM[d] === 2);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -148,7 +216,7 @@ export default function DashboardClient({ userName }: Props) {
           </Link>
         )}
 
-        {/* Ozet kartlari */}
+        {/* Özet kartları */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl p-5 border border-gray-200">
             <p className="text-xs text-gray-500 mb-1">LGS&apos;ye Kalan</p>
@@ -156,11 +224,11 @@ export default function DashboardClient({ userName }: Props) {
             <p className="text-xs text-gray-400">gün</p>
           </div>
           <div className="bg-white rounded-xl p-5 border border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">Genel Başarı</p>
+            <p className="text-xs text-gray-500 mb-1">LGS Ağırlıklı Başarı</p>
             <p className="text-2xl font-bold text-green-600">
               {genelOrtalama !== null ? `%${genelOrtalama}` : "—"}
             </p>
-            <p className="text-xs text-gray-400">ortalama</p>
+            <p className="text-xs text-gray-400">90 soruda</p>
           </div>
           <div className="bg-white rounded-xl p-5 border border-gray-200">
             <p className="text-xs text-gray-500 mb-1">Seri</p>
@@ -201,8 +269,18 @@ export default function DashboardClient({ userName }: Props) {
         {masteryPrediction && masteryPrediction.tahminler.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-700">LGS Tahmin ({masteryPrediction.lgsDaysLeft} gün kaldı)</h3>
-              <span className={`text-sm font-bold ${masteryPrediction.genelOrtalama >= 70 ? "text-green-600" : masteryPrediction.genelOrtalama >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+              <h3 className="text-sm font-semibold text-gray-700">
+                LGS Tahmin ({masteryPrediction.lgsDaysLeft} gün kaldı)
+              </h3>
+              <span
+                className={`text-sm font-bold ${
+                  masteryPrediction.genelOrtalama >= 70
+                    ? "text-green-600"
+                    : masteryPrediction.genelOrtalama >= 50
+                      ? "text-yellow-600"
+                      : "text-red-600"
+                }`}
+              >
                 %{masteryPrediction.genelOrtalama} tahmini
               </span>
             </div>
@@ -212,12 +290,22 @@ export default function DashboardClient({ userName }: Props) {
                   <span className="text-xs text-gray-500 w-32 truncate">{t.topicIsim}</span>
                   <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                     <div
-                      className={`h-1.5 rounded-full transition-all ${t.tahminiLgsSkor >= 70 ? "bg-green-500" : t.tahminiLgsSkor >= 50 ? "bg-yellow-500" : "bg-red-400"}`}
+                      className={`h-1.5 rounded-full transition-all ${
+                        t.tahminiLgsSkor >= 70
+                          ? "bg-green-500"
+                          : t.tahminiLgsSkor >= 50
+                            ? "bg-yellow-500"
+                            : "bg-red-400"
+                      }`}
                       style={{ width: `${t.tahminiLgsSkor}%` }}
                     />
                   </div>
-                  <span className="text-xs font-medium text-gray-600 w-8 text-right">%{t.tahminiLgsSkor}</span>
-                  <span className="text-xs">{t.trend === "yukselis" ? "↑" : t.trend === "duslus" ? "↓" : "→"}</span>
+                  <span className="text-xs font-medium text-gray-600 w-8 text-right">
+                    %{t.tahminiLgsSkor}
+                  </span>
+                  <span className="text-xs">
+                    {t.trend === "yukselis" ? "↑" : t.trend === "duslus" ? "↓" : "→"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -242,7 +330,7 @@ export default function DashboardClient({ userName }: Props) {
           </div>
         )}
 
-        {/* Hizli aksiyonlar */}
+        {/* Hızlı aksiyonlar */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {bugunTopicId ? (
             <Link
@@ -281,35 +369,44 @@ export default function DashboardClient({ userName }: Props) {
           </Link>
         </div>
 
-        {/* Ders ilerleme özeti */}
+        {/* LGS Oturum Bazında Ders İlerlemesi */}
         {Object.keys(dersBazindaMastery).length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Ders İlerlemesi</h2>
-            <div className="space-y-3">
-              {(["MATEMATIK", "FEN", "TURKCE"] as const)
-                .filter((d) => dersBazindaMastery[d] !== undefined)
-                .map((ders) => {
-                  const skor = dersBazindaMastery[ders];
-                  return (
-                    <div key={ders} className="flex items-center gap-3">
-                      <span className="w-28 text-sm text-gray-600 shrink-0">{DERS_ISIM[ders]}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${DERS_RENK[ders]}`}
-                          style={{ width: `${skor}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium w-8 text-right text-gray-600">
-                        %{skor}
-                      </span>
-                    </div>
-                  );
-                })}
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">
+              LGS Ders İlerlemesi
+            </h2>
+
+            {/* 1. Oturum — Sözel */}
+            <div className="mb-4">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+                1. Oturum (Sözel)
+              </p>
+              <div className="space-y-2">
+                {oturum1
+                  .filter((d) => dersBazindaMastery[d] !== undefined)
+                  .map((ders) => (
+                    <DersProgressBar key={ders} ders={ders} skor={dersBazindaMastery[ders]} />
+                  ))}
+              </div>
+            </div>
+
+            {/* 2. Oturum — Sayısal */}
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+                2. Oturum (Sayısal)
+              </p>
+              <div className="space-y-2">
+                {oturum2
+                  .filter((d) => dersBazindaMastery[d] !== undefined)
+                  .map((ders) => (
+                    <DersProgressBar key={ders} ders={ders} skor={dersBazindaMastery[ders]} />
+                  ))}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Konu ustaligi */}
+        {/* Konu ustalığı */}
         {masteriesLoading ? (
           <div className="space-y-4">
             {[1, 2].map((i) => (
@@ -327,32 +424,46 @@ export default function DashboardClient({ userName }: Props) {
           <>
             <h2 className="text-lg font-semibold mb-4">Konu Ustalığı</h2>
             <div className="space-y-4">
-              {Object.entries(dersBazinda).map(([ders, konular]) => (
-                <div key={ders} className="bg-white rounded-xl border border-gray-200 p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={`w-3 h-3 rounded-full ${DERS_RENK[ders] ?? "bg-gray-400"}`} />
-                    <h3 className="font-semibold text-sm">{DERS_ISIM[ders] ?? ders}</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {konular.sort((a, b) => a.skor - b.skor).map((m) => (
-                      <div key={m.topicId} className="flex items-center gap-3">
-                        <span className="w-40 text-sm text-gray-600 truncate">{m.topic.isim}</span>
-                        <div className="flex-1 bg-gray-100 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              m.skor >= 70 ? "bg-green-500" : m.skor >= 40 ? "bg-yellow-500" : "bg-red-500"
-                            }`}
-                            style={{ width: `${m.skor}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium w-8 text-right text-gray-600">
-                          %{Math.round(m.skor)}
+              {DERS_SIRA
+                .filter((ders) => dersBazinda[ders]?.length > 0)
+                .map((ders) => {
+                  const konular = dersBazinda[ders];
+                  return (
+                    <div key={ders} className="bg-white rounded-xl border border-gray-200 p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`w-3 h-3 rounded-full ${DERS_RENK[ders] ?? "bg-gray-400"}`} />
+                        <h3 className="font-semibold text-sm">{DERS_ISIM[ders] ?? ders}</h3>
+                        <span className="ml-auto text-xs text-gray-400">
+                          {LGS_SORU_SAYISI[ders]} soru
                         </span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                      <div className="space-y-2">
+                        {konular.sort((a, b) => a.skor - b.skor).map((m) => (
+                          <div key={m.topicId} className="flex items-center gap-3">
+                            <span className="w-40 text-sm text-gray-600 truncate">
+                              {m.topic.isim}
+                            </span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  m.skor >= 70
+                                    ? "bg-green-500"
+                                    : m.skor >= 40
+                                      ? "bg-yellow-500"
+                                      : "bg-red-500"
+                                }`}
+                                style={{ width: `${m.skor}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium w-8 text-right text-gray-600">
+                              %{Math.round(m.skor)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </>
         ) : null}

@@ -7,6 +7,7 @@
 import { RAGResult } from "../rag/search";
 import { getModelForTask, type TaskType } from "./model-router";
 import { sanitizeInput } from "../security/prompt-guard";
+import { callGemini } from "./providers/gemini-provider";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
@@ -17,14 +18,33 @@ interface StudentProfile {
   recentErrors?: string[]; // son hata kategorileri
 }
 
-async function callClaudeForTask(
+/**
+ * Provider-aware AI çağrısı — Claude veya Gemini'ye yönlendirir.
+ */
+async function callAIForTask(
   taskType: TaskType,
   prompt: string,
   studentCtx?: { masterySkoru: number; hataEgilimi?: string | null; tekrarYanlisSayisi?: number }
 ): Promise<string> {
   const config = getModelForTask(taskType, studentCtx);
-  if (config.model === "none") return "";
-  return callClaude(config.model, sanitizeInput(prompt, taskType), config.maxTokens);
+  if (config.provider === "none") return "";
+
+  const sanitized = sanitizeInput(prompt, taskType);
+
+  if (config.provider === "gemini") {
+    return callGemini(sanitized, config);
+  }
+
+  return callClaude(config.model, sanitized, config.maxTokens);
+}
+
+/** @deprecated Doğrudan callAIForTask kullan */
+async function callClaudeForTask(
+  taskType: TaskType,
+  prompt: string,
+  studentCtx?: { masterySkoru: number; hataEgilimi?: string | null; tekrarYanlisSayisi?: number }
+): Promise<string> {
+  return callAIForTask(taskType, prompt, studentCtx);
 }
 
 async function callClaude(
