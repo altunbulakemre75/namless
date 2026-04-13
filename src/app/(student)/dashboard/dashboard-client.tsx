@@ -182,18 +182,25 @@ export default function DashboardClient({ userName }: Props) {
                 </p>
               </div>
               <div className="text-right">
-                {tahminiTarih && (
-                  <>
-                    <p className="text-3xl font-bold">
-                      {Math.max(
-                        0,
-                        Math.ceil(
-                          (new Date(tahminiTarih).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                        )
-                      )}
-                    </p>
-                    <p className="text-sm text-blue-200">tahmini gün</p>
-                  </>
+                {tahminiTarih ? (() => {
+                  const hazirGun = Math.max(0, Math.ceil((new Date(tahminiTarih).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                  const yetisir = hazirGun <= kalanGun;
+                  return (
+                    <div>
+                      <p className="text-xs text-blue-200 mb-1">Bu okula hazır olma tahmini</p>
+                      <p className={`text-3xl font-bold ${yetisir ? "text-white" : "text-yellow-300"}`}>
+                        {hazirGun} gün
+                      </p>
+                      <p className="text-xs text-blue-200 mt-1">
+                        {yetisir ? `LGS'ye ${kalanGun} gün var — yetişirsin ✓` : `LGS'ye ${kalanGun} gün var — hızlan!`}
+                      </p>
+                    </div>
+                  );
+                })() : (
+                  <div className="text-right">
+                    <p className="text-xs text-blue-200">LGS&apos;ye kalan</p>
+                    <p className="text-3xl font-bold">{kalanGun} gün</p>
+                  </div>
                 )}
               </div>
             </div>
