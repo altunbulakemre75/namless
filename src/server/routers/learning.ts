@@ -302,16 +302,26 @@ export const learningRouter = router({
 
   // Kullanici profili (dashboard icin)
   getProfile: protectedProcedure.query(async ({ ctx }) => {
-    const user = await ctx.prisma.user.findUniqueOrThrow({
+    // upsert: kullanıcı yoksa oluştur (findUniqueOrThrow yerine)
+    const user = await ctx.prisma.user.upsert({
       where: { id: ctx.user.id },
+      update: {},
+      create: {
+        id: ctx.user.id,
+        email: ctx.user.email!,
+        isim: (ctx.user.user_metadata?.isim as string | undefined) ?? "Öğrenci",
+      },
     });
     // targetSchool tablosu henuz yoksa (db push yapilmamissa) null don
-    const targetSchool = user.targetSchoolId
-      ? await ctx.prisma.school.findUnique({
+    let targetSchool = null;
+    if (user.targetSchoolId) {
+      try {
+        targetSchool = await ctx.prisma.school.findUnique({
           where: { id: user.targetSchoolId },
           select: { id: true, isim: true, sehir: true, minPuan: true },
-        })
-      : null;
+        });
+      } catch { /* schools tablosu yoksa atla */ }
+    }
     return { ...user, targetSchool };
   }),
 
