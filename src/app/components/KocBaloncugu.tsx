@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { processStream } from "@/infrastructure/ai/streaming";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Sparkles, X, Camera, ImageIcon } from "lucide-react";
+import { Bot, Send, Sparkles, X, Camera } from "lucide-react";
 
 interface Props {
   topicId?: string;
@@ -51,7 +51,7 @@ const MOD_LABEL: Record<Mod, string> = {
   konu: "Konu",
   genel: "Genel",
   ipucu: "İpucu",
-  foto: "📷 Fotoğraf",
+  foto: "📷 Foto",
 };
 
 const MOD_TASK: Record<Mod, TaskType> = {
@@ -114,7 +114,6 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
-      // data:image/jpeg;base64,XXX → sadece XXX kısmını al
       const base64 = result.split(",")[1];
       setGorsel(base64);
       setMod("foto");
@@ -208,7 +207,6 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
 
   return (
     <>
-      {/* Gizli file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -221,26 +219,22 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
       {variant === "inline" ? (
         <div
           onClick={() => setAcik(true)}
-          className="mx-4 my-2 relative overflow-hidden group glass-panel rounded-2xl p-4 cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-500/20 transition-all border-2 border-violet-500/50"
+          className="mx-3 mt-4 mb-2 p-4 cursor-pointer rounded-2xl bg-[var(--ios-blue)] text-white hover:opacity-90 transition-opacity shadow-sm flex flex-col items-center gap-1.5"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-violet-600/10 to-indigo-600/10 pointer-events-none" />
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-violet-500/20 rounded-full blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-700" />
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30 text-white shrink-0">
-              <Bot className="w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="font-bold text-sm tracking-tight mb-0.5 flex flex-wrap items-center gap-1">
-                AI Koç'a Sor <Sparkles className="w-3 h-3 text-yellow-500" />
-              </h4>
-              <p className="text-[10px] text-foreground/60 leading-snug">Yardıma mı ihtiyacın var?</p>
-            </div>
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            <Bot className="w-5 h-5" />
+          </div>
+          <div className="text-center">
+            <h4 className="font-bold text-[13px] tracking-tight flex items-center justify-center gap-1">
+              AI Koç'a Sor <Sparkles className="w-3 h-3 text-yellow-300" />
+            </h4>
+            <p className="text-[10px] text-white/70 font-medium">Anında detaylı cevaplar</p>
           </div>
         </div>
       ) : (
         <button
           onClick={() => setAcik((v) => !v)}
-          className="fixed bottom-24 right-4 z-[999] w-14 h-14 rounded-full bg-violet-600 text-white shadow-lg hover:bg-violet-700 transition-all flex items-center justify-center text-2xl"
+          className="fixed bottom-24 right-4 z-[999] w-14 h-14 rounded-full bg-[var(--ios-blue)] text-white shadow-xl shadow-[var(--ios-blue)]/30 hover:scale-105 transition-transform flex items-center justify-center text-2xl"
           title="AI Koç"
         >
           {acik ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
@@ -254,47 +248,46 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-24 right-4 md:right-auto md:left-[300px] z-[999] w-[calc(100vw-32px)] sm:w-[360px] shadow-2xl bg-white dark:bg-[#0f0f13] border border-violet-500/20 rounded-3xl flex flex-col overflow-hidden"
+            className="fixed bottom-24 right-4 md:right-auto md:left-[300px] z-[990] w-[calc(100vw-32px)] sm:w-[380px] bg-background border border-foreground/10 rounded-3xl flex flex-col overflow-hidden shadow-2xl shadow-black/20"
             style={{ maxHeight: "75vh" }}
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-4 text-white flex items-center justify-between relative overflow-hidden">
-              <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 blur-[40px] rounded-full" />
-              <div className="relative z-10 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
-                  <Bot className="w-5 h-5 text-white" />
+            <div className="bg-foreground/5 backdrop-blur-3xl px-5 py-4 border-b border-foreground/5 flex items-center justify-between shrink-0 ios-glass">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[var(--ios-blue)] text-white flex items-center justify-center shadow-sm">
+                  <Bot className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-bold text-sm">AI Koç</p>
+                  <p className="font-bold text-[15px] tracking-tight text-foreground">AI Koç</p>
                   {topicIsim ? (
-                    <p className="text-[10px] text-white/80 uppercase tracking-widest">{topicIsim}</p>
+                    <p className="text-[11px] subheadline font-semibold tracking-widest uppercase">{topicIsim}</p>
                   ) : (
-                    <p className="text-[10px] text-white/80 uppercase tracking-widest flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> Çevrimiçi
+                    <p className="text-[11px] text-[var(--ios-blue)] font-semibold tracking-widest uppercase flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--ios-blue)] animate-pulse" /> Çevrimiçi
                     </p>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => setAcik(false)}
-                className="relative z-10 w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Mod seçici */}
-            <div className="px-4 py-2 bg-foreground/5 border-b border-foreground/10 flex gap-2 overflow-x-auto no-scrollbar">
+            <div className="px-4 py-2.5 bg-background flex gap-2 overflow-x-auto no-scrollbar shrink-0 shadow-sm border-b border-foreground/5">
               {(["konu", "genel", "ipucu", "foto"] as Mod[])
                 .filter((m) => m !== "konu" || !!topicIsim)
                 .map((m) => (
                   <button
                     key={m}
                     onClick={() => m === "foto" ? fileInputRef.current?.click() : setMod(m)}
-                    className={`text-[11px] px-3 py-1.5 rounded-full font-semibold transition-colors whitespace-nowrap ${
+                    className={`text-[12px] px-3.5 py-1.5 rounded-full font-bold transition-all whitespace-nowrap ${
                       mod === m
-                        ? "bg-violet-600 text-white shadow-md shadow-violet-500/20"
-                        : "bg-background text-foreground/60 border border-foreground/10 hover:bg-foreground/5 hover:text-foreground"
+                        ? "bg-[var(--ios-blue)] text-white"
+                        : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10 hover:text-foreground"
                     }`}
                   >
                     {MOD_LABEL[m]}
@@ -303,13 +296,13 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
             </div>
 
             {/* Mesajlar */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-background/50">
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-background">
               {mesajlar.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
-                  <Bot className="w-12 h-12 text-violet-500 mb-3 opacity-50" />
-                  <p className="text-sm font-medium">Sormak istediğin bir şey var mı?</p>
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-70">
+                  <Bot className="w-12 h-12 text-foreground/30 mb-3" />
+                  <p className="text-[15px] font-semibold text-foreground">Size nasıl yardımcı olabilirim?</p>
                   {mod === "foto" && (
-                    <p className="text-xs mt-1 text-violet-400">📷 Fotoğraf seçtikten sonra soruyu yaz</p>
+                    <p className="text-[13px] mt-1 text-[var(--ios-blue)] font-medium">Fotoğraf seçtikten sonra soruyu yaz</p>
                   )}
                 </div>
               )}
@@ -321,15 +314,15 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
                   className={`flex ${m.rol === "kullanici" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                    className={`max-w-[85%] rounded-[20px] px-4 py-3 text-[15px] font-medium leading-relaxed tracking-tight ${
                       m.rol === "kullanici"
-                        ? "bg-violet-600 text-white rounded-br-none"
-                        : "bg-foreground/5 border border-foreground/10 text-foreground rounded-bl-none"
+                        ? "bg-[var(--ios-blue)] text-white rounded-br-[4px]"
+                        : "bg-foreground/5 text-foreground rounded-bl-[4px]"
                     }`}
                   >
                     {m.gorsel && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.gorsel} alt="soru" className="rounded-lg mb-2 max-h-40 object-contain" />
+                      <img src={m.gorsel} alt="soru" className="rounded-xl mb-3 max-h-48 object-contain border border-foreground/10" />
                     )}
                     {m.metin || (streaming && i === mesajlar.length - 1 ? (
                       <span className="inline-flex gap-1 items-center h-4">
@@ -346,12 +339,12 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
 
             {/* Takip soruları */}
             {takipSorular.length > 0 && !streaming && (
-              <div className="px-5 pb-3 flex flex-wrap gap-2 bg-background">
+              <div className="px-4 pb-3 flex flex-wrap gap-2 shrink-0 bg-background">
                 {takipSorular.map((s) => (
                   <button
                     key={s}
                     onClick={() => gonder(s)}
-                    className="text-[11px] bg-foreground/5 text-foreground/80 font-medium border border-foreground/10 rounded-full px-3 py-1.5 hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200 dark:hover:bg-violet-500/20 dark:hover:text-violet-300 dark:hover:border-violet-500/30 transition-all text-left"
+                    className="text-[12px] bg-foreground/5 text-foreground font-semibold border border-foreground/10 rounded-full px-3 py-1.5 hover:bg-foreground/10 transition-all text-left"
                   >
                     {s}
                   </button>
@@ -361,34 +354,34 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
 
             {/* Gorsel önizleme */}
             {gorsel && (
-              <div className="px-4 pb-1 bg-background flex items-center gap-2">
+              <div className="px-4 pb-2 bg-background flex items-center gap-3 shrink-0">
                 <div className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`data:image/jpeg;base64,${gorsel}`}
                     alt="seçilen"
-                    className="h-14 rounded-lg object-cover border border-violet-500/30"
+                    className="h-16 w-16 rounded-xl object-cover border border-[var(--ios-blue)]/50"
                   />
                   <button
                     onClick={() => setGorsel(null)}
-                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 rounded-full text-white flex items-center justify-center"
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-rose-500 rounded-full text-white flex items-center justify-center shadow-md"
                   >
-                    <X className="w-2.5 h-2.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
-                <p className="text-xs text-white/40">Fotoğraf eklendi</p>
+                <p className="text-[11px] subheadline font-bold uppercase tracking-widest">Görsel Eklendi</p>
               </div>
             )}
 
-            {/* Input */}
-            <div className="p-4 border-t border-foreground/10 bg-background/80 backdrop-blur pb-safe">
+            {/* Input alanı */}
+            <div className="p-4 bg-background border-t border-foreground/5 shrink-0 pb-safe">
               <div className="relative flex items-center gap-2">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-9 h-9 rounded-full bg-foreground/5 border border-foreground/10 flex items-center justify-center text-foreground/50 hover:text-violet-500 hover:border-violet-500/30 transition-colors flex-shrink-0"
+                  className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center text-foreground hover:bg-[var(--ios-blue)]/10 hover:text-[var(--ios-blue)] transition-colors shrink-0"
                   title="Fotoğraf ekle"
                 >
-                  <Camera className="w-4 h-4" />
+                  <Camera className="w-5 h-5" />
                 </button>
                 <div className="relative flex-1">
                   <input
@@ -396,17 +389,17 @@ export default function KocBaloncugu({ topicId, topicIsim, ders, variant = "inli
                     value={girdi}
                     onChange={(e) => setGirdi(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && gonder()}
-                    placeholder={gorsel ? "Soruyu yaz..." : "Bir şey sor..."}
+                    placeholder={gorsel ? "Görsel hakkında sor..." : "Oğrenmek istediğin şey..."}
                     disabled={streaming}
-                    className="w-full bg-foreground/5 text-sm border border-foreground/10 rounded-full pl-5 pr-12 py-3 outline-none focus:border-violet-500 focus:bg-background transition-all disabled:opacity-50"
+                    className="w-full bg-foreground/5 text-[15px] font-medium border border-transparent rounded-full pl-5 pr-12 py-3 outline-none focus:border-[var(--ios-blue)]/50 transition-all disabled:opacity-50"
                   />
                   <button
                     onClick={() => gonder()}
                     disabled={!girdi.trim() || streaming}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 bg-violet-600 text-white rounded-full flex items-center justify-center disabled:opacity-40 hover:bg-violet-700 transition-colors shadow-sm"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 bg-[var(--ios-blue)] text-white rounded-full flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm"
                     title="Gönder"
                   >
-                    <Send className="w-3.5 h-3.5 ml-0.5" />
+                    <Send className="w-4 h-4 ml-0.5" />
                   </button>
                 </div>
               </div>

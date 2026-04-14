@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { trpc } from "../../lib/trpc";
+import { FileText, Timer, ChevronLeft, Lock } from "lucide-react";
 
 const DERS_ISIM: Record<string, string> = {
   MATEMATIK: "Matematik", FEN: "Fen Bilimleri", TURKCE: "Türkçe",
@@ -88,22 +89,26 @@ export default function DenemePage() {
   // Secim ekrani
   if (mod === "secim") {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="min-h-screen bg-background text-foreground py-10 px-6">
         <div className="max-w-lg mx-auto">
-          <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-4 mb-2">Deneme Sınavı</h1>
-          <p className="text-gray-500 mb-6">LGS formatında 20 soruluk deneme</p>
+          <Link href="/dashboard" className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ios-blue)] hover:opacity-70 transition-opacity mb-8">
+            <ChevronLeft className="w-4 h-4" /> Dashboard
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight mb-2">Deneme Sınavı</h1>
+          <p className="subheadline mb-10">LGS formatında 20 soruluk deneme</p>
 
           <button
             onClick={() => basla(false)}
             disabled={createMutation.isPending}
-            className="w-full mb-4 p-5 rounded-2xl border-2 border-blue-500 bg-blue-50 hover:bg-blue-100 transition-all text-left"
+            className="w-full mb-4 p-6 rounded-squircle ios-card text-left group hover:-translate-y-1 transition-transform border border-transparent hover:border-[var(--ios-blue)]/50"
           >
-            <div className="flex items-center gap-4">
-              <span className="text-3xl">📝</span>
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-squircle bg-[var(--ios-blue)]/10 text-[var(--ios-blue)] flex items-center justify-center group-hover:scale-105 transition-transform">
+                <FileText className="w-7 h-7" />
+              </div>
               <div>
-                <p className="font-bold text-blue-900">Normal Deneme</p>
-                <p className="text-blue-600 text-sm">Süresiz, rahat tempo</p>
+                <p className="font-bold text-[17px] text-foreground tracking-tight mb-0.5">Normal Deneme</p>
+                <p className="text-[13px] subheadline">Süresiz, rahat tempo</p>
               </div>
             </div>
           </button>
@@ -111,13 +116,15 @@ export default function DenemePage() {
           <button
             onClick={() => basla(true)}
             disabled={createMutation.isPending}
-            className="w-full p-5 rounded-2xl border-2 border-red-400 bg-red-50 hover:bg-red-100 transition-all text-left"
+            className="w-full p-6 rounded-squircle ios-card text-left group hover:-translate-y-1 transition-transform border border-transparent hover:border-red-500/50"
           >
-            <div className="flex items-center gap-4">
-              <span className="text-3xl">⏱️</span>
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-squircle bg-red-500/10 text-red-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Timer className="w-7 h-7" />
+              </div>
               <div>
-                <p className="font-bold text-red-900">Stres Modu</p>
-                <p className="text-red-600 text-sm">Tam ekran, geri sayım, gerçek sınav baskısı</p>
+                <p className="font-bold text-[17px] text-foreground tracking-tight mb-0.5">Stres Modu</p>
+                <p className="text-[13px] subheadline">Tam ekran, geri sayım, gerçek sınav baskısı</p>
               </div>
             </div>
           </button>
@@ -129,27 +136,28 @@ export default function DenemePage() {
   // Sonuc ekrani
   if (mod === "sonuc" && sonuc) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-lg mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg p-8 text-center mb-6">
-            <p className="text-4xl mb-3">{sonuc.net >= 15 ? "🎉" : sonuc.net >= 10 ? "💪" : "📚"}</p>
-            <h1 className="text-2xl font-bold mb-2">Deneme Tamamlandı!</h1>
-            <div className="text-5xl font-bold text-blue-600 my-4">{sonuc.net.toFixed(1)}</div>
-            <p className="text-gray-500">net puan</p>
+      <div className="min-h-screen bg-background text-foreground py-12 px-6">
+        <div className="max-w-md mx-auto">
+          <div className="ios-card rounded-squircle shadow-xl shadow-foreground/5 p-10 text-center mb-6">
+            <p className="text-5xl mb-4">{sonuc.net >= 15 ? "🎉" : sonuc.net >= 10 ? "💪" : "📚"}</p>
+            <h1 className="text-2xl font-bold tracking-tight mb-1">Deneme Tamamlandı</h1>
+            <p className="subheadline text-sm font-medium mb-6">Sonucun hesaplandı.</p>
+            <div className="text-6xl font-black text-foreground mb-1 tracking-tighter">{sonuc.net.toFixed(1)}</div>
+            <p className="text-xs subheadline uppercase tracking-widest font-semibold">Net Puan</p>
           </div>
 
           {/* Koc yorumu */}
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-6">
-            <p className="text-sm font-semibold text-purple-800 mb-1">Koç Yorumu:</p>
-            <p className="text-sm text-purple-700">{sonuc.kocYorumu}</p>
+          <div className="ios-card rounded-squircle bg-[var(--ios-blue)]/5 border-none p-6 mb-8">
+            <p className="text-[11px] font-bold text-[var(--ios-blue)] uppercase tracking-widest flex items-center gap-2 mb-2">Koç Yorumu</p>
+            <p className="text-[15px] font-medium leading-relaxed tracking-tight">{sonuc.kocYorumu}</p>
           </div>
 
-          <div className="flex gap-3">
-            <Link href="/deneme" className="flex-1 text-center border border-gray-300 py-3 rounded-xl font-medium hover:bg-gray-50">
-              Tekrar Dene
+          <div className="flex flex-col gap-3">
+            <Link href="/dashboard" className="w-full text-center bg-[var(--ios-blue)] text-white py-4 rounded-squircle font-semibold hover:opacity-90 transition-opacity">
+              Dashboard'a Dön
             </Link>
-            <Link href="/dashboard" className="flex-1 text-center bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700">
-              Dashboard
+            <Link href="/deneme" className="w-full text-center text-[var(--ios-blue)] bg-[var(--ios-blue)]/10 py-4 rounded-squircle font-semibold hover:opacity-80 transition-opacity">
+              Tekrar Dene
             </Link>
           </div>
         </div>
@@ -157,16 +165,18 @@ export default function DenemePage() {
     );
   }
 
-  // Sinav ekrani
+  // Sinav ekrani (Giris yoksa veya data yoksa)
   const soru = sorular[mevcutIdx];
   if (!soru) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center max-w-md">
-          <p className="text-4xl mb-3">🔒</p>
-          <h2 className="text-xl font-bold mb-2">Giriş Gerekli</h2>
-          <p className="text-gray-500 mb-6 text-sm">Deneme sınavını kullanmak için giriş yapman gerekiyor.</p>
-          <Link href="/auth/login" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700">
+      <div className="min-h-screen bg-background py-16 px-6">
+        <div className="max-w-md mx-auto ios-card rounded-squircle shadow-xl shadow-foreground/5 p-10 text-center">
+          <div className="w-16 h-16 bg-foreground/5 rounded-full flex items-center justify-center mx-auto mb-6 text-foreground/50">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight mb-2">Giriş Gerekli</h2>
+          <p className="text-[15px] subheadline font-medium mb-8">Deneme sınavını kullanmak için giriş yapman gerekiyor.</p>
+          <Link href="/auth/login" className="inline-block w-full bg-[var(--ios-blue)] text-white px-6 py-4 rounded-squircle font-semibold shadow-md hover:opacity-90 transition-opacity">
             Giriş Yap
           </Link>
         </div>
@@ -178,49 +188,53 @@ export default function DenemePage() {
   const saniye = kalanSaniye % 60;
 
   return (
-    <div className={`min-h-screen ${stressModu ? "bg-gray-900" : "bg-gray-50"} py-4 px-4`}>
-      <div className="max-w-2xl mx-auto">
+    <div className={`min-h-screen ${stressModu ? "bg-black text-white" : "bg-background text-foreground"} py-6 px-4 md:px-6 transition-colors duration-500`}>
+      <div className="max-w-3xl mx-auto h-[calc(100vh-3rem)] flex flex-col">
         {/* Ust bar */}
-        <div className={`flex items-center justify-between mb-4 ${stressModu ? "text-white" : "text-gray-600"}`}>
-          <span className="text-sm font-medium">Soru {mevcutIdx + 1}/{sorular.length}</span>
+        <div className={`flex items-center justify-between shrink-0 mb-6 px-2 ${stressModu ? "text-white" : "text-foreground"}`}>
+          <span className="text-[15px] font-semibold tracking-tight">Soru {mevcutIdx + 1}/{sorular.length}</span>
           {stressModu && (
-            <span className={`text-lg font-bold font-mono ${kalanSaniye < 60 ? "text-red-400 animate-pulse" : "text-yellow-400"}`}>
+            <span className={`text-xl font-bold font-mono tracking-tighter ${kalanSaniye < 60 ? "text-red-500 animate-pulse" : "text-[var(--ios-blue)]"}`}>
               {String(dakika).padStart(2, "0")}:{String(saniye).padStart(2, "0")}
             </span>
           )}
-          <span className={`text-xs px-2 py-0.5 rounded ${stressModu ? "bg-gray-800 text-gray-400" : "bg-gray-200 text-gray-600"}`}>
+          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md uppercase tracking-widest ${stressModu ? "bg-white/10 text-white/70" : "bg-foreground/5 subheadline"}`}>
             {DERS_ISIM[soru.ders]}
           </span>
         </div>
 
         {/* Progress */}
-        <div className={`w-full rounded-full h-1.5 mb-6 ${stressModu ? "bg-gray-800" : "bg-gray-200"}`}>
-          <div className={`h-1.5 rounded-full transition-all ${stressModu ? "bg-red-500" : "bg-blue-600"}`}
+        <div className={`w-full rounded-full h-1.5 mb-8 shrink-0 ${stressModu ? "bg-white/10" : "bg-foreground/5"}`}>
+          <div className={`h-full rounded-full transition-all duration-300 ${stressModu ? "bg-red-500" : "bg-[var(--ios-blue)]"}`}
             style={{ width: `${((mevcutIdx + 1) / sorular.length) * 100}%` }} />
         </div>
 
         {/* Soru */}
-        <div className={`rounded-2xl p-6 mb-4 ${stressModu ? "bg-gray-800 border border-gray-700" : "bg-white shadow-sm border border-gray-200"}`}>
-          <p className={`text-[17px] font-medium mb-6 leading-relaxed ${stressModu ? "text-white" : "text-gray-900"}`}>
+        <div className={`flex-1 overflow-y-auto mb-6 px-2 ${stressModu ? "scrollbar-dark" : ""}`}>
+          <p className={`text-lg md:text-xl font-medium mb-10 leading-relaxed tracking-tight ${stressModu ? "text-gray-200" : "text-foreground"}`}>
             {soru.soruMetni}
           </p>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {soru.siklar.map((sik, idx) => {
               const secili = cevaplar.get(mevcutIdx) === idx;
               return (
                 <button
                   key={idx}
                   onClick={() => cevapSec(mevcutIdx, idx)}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                  className={`w-full text-left p-5 md:p-6 rounded-2xl md:rounded-squircle transition-all border ${
                     secili
-                      ? stressModu ? "border-red-500 bg-red-900/30 text-white" : "border-blue-500 bg-blue-50"
-                      : stressModu ? "border-gray-700 hover:border-gray-500 text-gray-300" : "border-gray-200 hover:border-blue-400 hover:bg-blue-50"
+                      ? stressModu ? "bg-red-500/20 border-red-500/50 text-white" : "bg-[var(--ios-blue)]/5 border-[var(--ios-blue)]/50 text-[var(--ios-blue)] font-medium"
+                      : stressModu ? "bg-white/5 border-white/5 hover:border-white/20 text-gray-300" : "bg-background border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02]"
                   }`}
                 >
-                  <span className={`font-semibold mr-3 ${stressModu ? "text-gray-500" : "text-gray-400"}`}>
-                    {String.fromCharCode(65 + idx)})
-                  </span>
-                  {sik}
+                  <div className="flex items-start gap-4">
+                    <span className={`font-bold mt-[1px] ${
+                      secili ? stressModu ? "text-red-400" : "text-[var(--ios-blue)]" : stressModu ? "text-gray-500" : "subheadline"
+                    }`}>
+                      {String.fromCharCode(65 + idx)}
+                    </span>
+                    <span className="leading-snug">{sik}</span>
+                  </div>
                 </button>
               );
             })}
@@ -228,29 +242,29 @@ export default function DenemePage() {
         </div>
 
         {/* Navigasyon */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0 px-2 py-4 mt-auto">
           <button
             onClick={() => setMevcutIdx((i) => Math.max(0, i - 1))}
             disabled={mevcutIdx === 0}
-            className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-30 ${
-              stressModu ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+            className={`px-5 py-3 rounded-full text-[15px] font-semibold disabled:opacity-30 transition-colors ${
+              stressModu ? "bg-white/10 text-white hover:bg-white/20" : "bg-foreground/5 text-foreground hover:bg-foreground/10"
             }`}
           >
-            ← Önceki
+            Önceki
           </button>
 
-          {/* Soru numaralari */}
-          <div className="flex gap-1 flex-wrap justify-center max-w-[300px]">
+          {/* Soru numaralari (Masaustunde goster) */}
+          <div className="hidden md:flex gap-1.5 flex-wrap justify-center max-w-[400px]">
             {sorular.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => setMevcutIdx(idx)}
-                className={`w-7 h-7 rounded text-xs font-medium ${
+                className={`w-8 h-8 rounded-full text-xs font-bold transition-all ${
                   idx === mevcutIdx
-                    ? stressModu ? "bg-red-600 text-white" : "bg-blue-600 text-white"
+                    ? stressModu ? "bg-red-500 text-white scale-110" : "bg-[var(--ios-blue)] text-white scale-110 shadow-sm shadow-[var(--ios-blue)]/30"
                     : cevaplar.has(idx)
-                      ? stressModu ? "bg-gray-700 text-green-400" : "bg-green-100 text-green-700"
-                      : stressModu ? "bg-gray-800 text-gray-500" : "bg-gray-100 text-gray-500"
+                      ? stressModu ? "bg-white/20 text-white" : "bg-[var(--ios-blue)]/10 text-[var(--ios-blue)]"
+                      : stressModu ? "bg-white/5 text-gray-500 hover:bg-white/10" : "bg-foreground/5 subheadline hover:bg-foreground/10 hover:text-foreground"
                 }`}
               >
                 {idx + 1}
@@ -261,20 +275,20 @@ export default function DenemePage() {
           {mevcutIdx + 1 >= sorular.length ? (
             <button
               onClick={bitirir}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-                stressModu ? "bg-red-600 text-white hover:bg-red-700" : "bg-blue-600 text-white hover:bg-blue-700"
+              className={`px-7 py-3 rounded-full text-[15px] font-bold transition-colors ${
+                stressModu ? "bg-red-600 text-white hover:bg-red-500" : "bg-[var(--ios-blue)] text-white hover:opacity-90 shadow-md shadow-[var(--ios-blue)]/20"
               }`}
             >
-              Bitir →
+              Bitir
             </button>
           ) : (
             <button
               onClick={() => setMevcutIdx((i) => i + 1)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                stressModu ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+              className={`px-5 py-3 rounded-full text-[15px] font-semibold transition-colors ${
+                stressModu ? "bg-white/10 text-white hover:bg-white/20" : "bg-[var(--ios-blue)]/10 text-[var(--ios-blue)] hover:bg-[var(--ios-blue)]/20"
               }`}
             >
-              Sonraki →
+              Sonraki
             </button>
           )}
         </div>

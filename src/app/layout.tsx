@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TRPCProvider } from "../lib/trpc-provider";
-import KocBaloncugu from "./components/KocBaloncugu";
+// AI Koç Baloncuğu küresel düzen(layout)'dan tamamen kaldırıldı ve SidebarLayout içerisine taşındı.
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +32,6 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-gray-50">
         <TRPCProvider>
           {children}
-          <KocBaloncugu />
         </TRPCProvider>
       </body>
     </html>
