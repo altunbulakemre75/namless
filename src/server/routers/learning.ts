@@ -315,6 +315,27 @@ export const learningRouter = router({
     return { ...user, targetSchool };
   }),
 
+  // Profil güncelle: isim + günlük süre
+  updateProfile: protectedProcedure
+    .input(
+      z.object({
+        isim: z.string().min(2, "İsim en az 2 karakter olmalı").max(50, "İsim en fazla 50 karakter olabilir").optional(),
+        dailyStudyMins: z.number().min(15).max(480).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const data: Record<string, unknown> = {};
+      if (input.isim !== undefined) data.isim = input.isim.trim();
+      if (input.dailyStudyMins !== undefined) data.dailyStudyMins = input.dailyStudyMins;
+
+      const updated = await ctx.prisma.user.update({
+        where: { id: ctx.user.id },
+        data,
+        select: { isim: true, dailyStudyMins: true, email: true },
+      });
+      return updated;
+    }),
+
   // Deneme sonrasi otomatik plan olustur
   createPlanFromExam: protectedProcedure
     .input(z.object({

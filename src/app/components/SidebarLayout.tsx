@@ -99,26 +99,29 @@ export default function SidebarLayout({ children, userName, onLogout }: Props) {
 
         {/* User panel */}
         <div className="p-4 border-t border-foreground/10 bg-background/50">
-          <div className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-foreground/5 cursor-pointer transition-all border border-transparent hover:border-foreground/10">
+          <Link
+            href="/profil"
+            className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-foreground/5 cursor-pointer transition-all border border-transparent hover:border-foreground/10 group"
+          >
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-inner">
               <span className="text-white text-sm font-bold shadow-sm">
                 {(userName ?? "Ö").charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{userName ?? "Öğrenci"}</p>
-              <p className="text-xs text-foreground/50">Öğrenci Paneli</p>
+              <p className="text-sm font-semibold truncate group-hover:text-violet-400 transition-colors">{userName ?? "Öğrenci"}</p>
+              <p className="text-xs text-foreground/50">Profili görüntüle</p>
             </div>
             {onLogout && (
               <button
-                onClick={onLogout}
+                onClick={(e) => { e.preventDefault(); onLogout(); }}
                 className="text-foreground/40 hover:text-red-500 transition-colors p-2 rounded-xl hover:bg-red-500/10"
                 title="Çıkış yap"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             )}
-          </div>
+          </Link>
         </div>
       </aside>
 
