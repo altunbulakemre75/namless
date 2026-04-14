@@ -1,52 +1,77 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { 
+  BookOpen, Calculator, Beaker, Globe, Sparkles, Target, 
+  Brain, BarChart3, AlertCircle, ArrowRight, Zap, CheckCircle 
+} from "lucide-react";
 
 const DERSLER = [
-  { isim: "Türkçe",        key: "TURKCE",    ikon: "📖", renk: "from-red-500 to-rose-600",       soru: 20 },
-  { isim: "Matematik",     key: "MATEMATIK", ikon: "📐", renk: "from-indigo-500 to-blue-600",     soru: 20 },
-  { isim: "Fen Bilimleri", key: "FEN",       ikon: "🔬", renk: "from-emerald-500 to-green-600",   soru: 20 },
-  { isim: "Sosyal Bilgiler",key: "SOSYAL",   ikon: "🌍", renk: "from-orange-500 to-amber-600",    soru: 10 },
-  { isim: "Din Kültürü",   key: "DIN",       ikon: "☪️", renk: "from-teal-500 to-cyan-600",       soru: 10 },
-  { isim: "İngilizce",     key: "INGILIZCE", ikon: "🇬🇧", renk: "from-violet-500 to-purple-600",  soru: 10 },
+  { isim: "Türkçe", key: "TURKCE", icon: BookOpen, color: "text-rose-500", bg: "bg-rose-500/10", soru: 20 },
+  { isim: "Matematik", key: "MATEMATIK", icon: Calculator, color: "text-blue-500", bg: "bg-blue-500/10", soru: 20 },
+  { isim: "Fen Bilimleri", key: "FEN", icon: Beaker, color: "text-emerald-500", bg: "bg-emerald-500/10", soru: 20 },
+  { isim: "Sosyal Bilgiler", key: "SOSYAL", icon: Globe, color: "text-orange-500", bg: "bg-orange-500/10", soru: 10 },
+  { isim: "Din Kültürü", key: "DIN", icon: Sparkles, color: "text-teal-500", bg: "bg-teal-500/10", soru: 10 },
+  { isim: "İngilizce", key: "INGILIZCE", icon: Zap, color: "text-violet-500", bg: "bg-violet-500/10", soru: 10 },
 ];
 
 const OZELLIKLER = [
-  { ikon: "🎯", baslik: "Hedef Okul Tahmini", aciklama: "Galatasaray Lisesi için 67 günde hazır olursun — gerçek veri", renk: "bg-indigo-50 border-indigo-100" },
-  { ikon: "🤖", baslik: "AI Konu Anlatımı", aciklama: "Her konuyu anında anlat, sana özel örnekler ve tekrar soruları", renk: "bg-violet-50 border-violet-100" },
-  { ikon: "📊", baslik: "Bayesian Mastery", aciklama: "Sadece doğru/yanlış değil, bilgi kalıcılığını ölç ve takip et", renk: "bg-blue-50 border-blue-100" },
-  { ikon: "🔍", baslik: "Hata Analizi", aciklama: "Dikkatsizlik mi, kavram eksikliği mi — AI sınıflandırıyor", renk: "bg-orange-50 border-orange-100" },
-  { ikon: "🔥", baslik: "Streak & Motivasyon", aciklama: "Günlük seri takibi, rozet sistemi, haftalık hedefler", renk: "bg-red-50 border-red-100" },
-  { ikon: "👪", baslik: "Veli Raporu", aciklama: "Grafik değil aksiyon: Bu hafta geometriyi sorun", renk: "bg-emerald-50 border-emerald-100" },
+  { icon: Target, baslik: "Hedef Okul Tahmini", aciklama: "Hedef Lisesi için kaç günde hazır olursun? Gerçek veri ile tahmin.", gradient: "from-indigo-500 to-blue-500" },
+  { icon: Brain, baslik: "AI Konu Anlatımı", aciklama: "Her konuyu sana anında anlatan, sana özel örnekler veren asistan.", gradient: "from-violet-500 to-purple-500" },
+  { icon: BarChart3, baslik: "Bayesian Mastery", aciklama: "Doğru/yanlış değil, bilgi kalıcılığını olasılıkla ölç ve takip et.", gradient: "from-blue-500 to-cyan-500" },
+  { icon: AlertCircle, baslik: "Hata Analizi", aciklama: "Dikkatsizlik mi, kavram eksikliği mi? AI hatanı sınıflandırıyor.", gradient: "from-orange-500 to-red-500" },
 ];
 
-const NASIL: { adim: string; baslik: string; aciklama: string; renk: string }[] = [
-  { adim: "1", baslik: "Seviyeni Belirle", aciklama: "AI adaptif test ile gerçek seviyeni ölç", renk: "bg-violet-100 text-violet-700" },
-  { adim: "2", baslik: "Hedef Okul Seç", aciklama: "Kaç günde hazır olduğunu hesapla", renk: "bg-indigo-100 text-indigo-700" },
-  { adim: "3", baslik: "Her Gün Çalış", aciklama: "AI koçun günlük planını hazırlar, yönlendirir", renk: "bg-blue-100 text-blue-700" },
-  { adim: "4", baslik: "Deneme Çöz", aciklama: "LGS formatında stres simülasyonu yap", renk: "bg-emerald-100 text-emerald-700" },
+const NASIL = [
+  { adim: "1", baslik: "Seviyeni Belirle", aciklama: "AI adaptif test ile gerçek seviyeni ölç, zayıf yanlarını gör." },
+  { adim: "2", baslik: "Hedef Seç", aciklama: "Hayalindeki liseyi seç, yapay zeka senin için rotayı çizsin." },
+  { adim: "3", baslik: "Her Gün Çalış", aciklama: "Sana özel hazırlanan günlük planda koçunla eksiklerini kapat." },
+  { adim: "4", baslik: "Gerçek Sınav Stresi", aciklama: "LGS formatında hazırlanan denemelerle sınav provası yap." },
 ];
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
 
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden">
+      {/* ── Background Glow ── */}
+      <div className="fixed inset-0 z-[-1] pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/20 dark:bg-violet-900/30 blur-[120px]" />
+        <div className="absolute top-[20%] right-[-10%] w-[30%] h-[50%] rounded-full bg-blue-600/20 dark:bg-blue-900/20 blur-[100px]" />
+        <div className="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 dark:bg-indigo-900/20 blur-[120px]" />
+      </div>
+
       {/* ── Header ── */}
-      <header className="sticky top-0 bg-white/80 backdrop-blur border-b border-gray-100 px-6 py-4 z-50">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-              <span className="text-white font-black text-xs">LGS</span>
-            </div>
-            <span className="font-black text-gray-900 text-lg">AI Koçu</span>
-          </div>
+      <header className="fixed top-0 inset-x-0 glass z-50 transition-all duration-300">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
+              <span className="text-white font-black text-sm tracking-tighter">LGS</span>
+            </div>
+            <span className="font-bold text-lg tracking-tight">AI Koçu</span>
+          </div>
+          <div className="flex items-center gap-4">
             <Link
               href="/auth/login"
-              className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors px-3 py-2"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
             >
               Giriş Yap
             </Link>
             <Link
               href="/auth/register"
-              className="bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 transition-colors text-sm font-semibold shadow-sm"
+              className="bg-foreground text-background px-5 py-2.5 rounded-full hover:scale-105 transition-transform text-sm font-semibold shadow-md dark:shadow-none"
             >
               Ücretsiz Başla
             </Link>
@@ -54,160 +79,153 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ── Hero ── */}
-      <section className="bg-gradient-to-br from-slate-900 via-violet-950 to-indigo-950 text-white py-20 px-6 relative overflow-hidden">
-        {/* Dekoratif arka plan */}
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: "radial-gradient(circle at 20% 50%, #7c3aed 0%, transparent 50%), radial-gradient(circle at 80% 20%, #4f46e5 0%, transparent 50%)"
-        }} />
+      <main className="flex-grow pt-32 pb-20">
+        {/* ── Hero ── */}
+        <section className="px-6 mb-32">
+          <motion.div 
+            className="max-w-4xl mx-auto text-center"
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer}
+          >
+            <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 glass px-4 py-2 rounded-full mb-8 border-violet-500/20">
+              <Sparkles className="w-4 h-4 text-violet-500" />
+              <span className="text-sm font-medium">LGS 2026 İçin Yapay Zeka Koçun Hazır</span>
+            </motion.div>
 
-        <div className="max-w-4xl mx-auto text-center relative">
-          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-2 mb-6 text-sm font-medium text-violet-200">
-            <span>🎯</span>
-            <span>LGS 2026 — 7 Haziran&apos;a hazır mısın?</span>
-          </div>
+            <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl font-black mb-8 leading-[1.1] tracking-tight">
+              Yapay Zeka ile <br />
+              <span className="text-gradient">
+                Sınavda Fark Yarat
+              </span>
+            </motion.h1>
 
-          <h1 className="text-4xl md:text-6xl font-black mb-6 leading-tight">
-            Yapay Zeka ile<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-300">
-              LGS&apos;yi Fethet
-            </span>
-          </h1>
+            <motion.p variants={fadeInUp} className="text-lg md:text-xl text-foreground/60 mb-10 max-w-2xl mx-auto leading-relaxed">
+              Özel denemeler, zayıf nokta analizi ve saniye saniye takip edilen motivasyon grafiğiyle hayalindeki liseye giden yolu aydınlat.
+            </motion.p>
 
-          <p className="text-lg md:text-xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Seviyeni belirle. Hedef okulunu seç. AI koçun her gün yanında — zayıf konuları güçlendir, sınav psikolojisini kazan.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/auth/register"
-              className="w-full sm:w-auto bg-violet-600 hover:bg-violet-500 text-white px-8 py-4 rounded-2xl font-bold text-base shadow-lg hover:shadow-violet-500/30 transition-all"
-            >
-              Hemen Başla — Ücretsiz →
-            </Link>
-            <Link
-              href="/diagnostic"
-              className="w-full sm:w-auto border border-white/30 text-white px-8 py-4 rounded-2xl font-semibold text-base hover:bg-white/10 transition-all"
-            >
-              Seviyemi Ölç
-            </Link>
-          </div>
-
-          {/* Sosyal kanıt */}
-          <p className="mt-8 text-sm text-slate-400">
-            Kredi kartı gerekmez · Anında başla · AI destekli
-          </p>
-        </div>
-      </section>
-
-      {/* ── Nasıl Çalışır? ── */}
-      <section className="py-16 px-6 bg-slate-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-black text-gray-900 mb-2">Nasıl Çalışır?</h2>
-            <p className="text-gray-500">4 adımda LGS&apos;ye hazırlan</p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {NASIL.map((item) => (
-              <div key={item.adim} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mx-auto mb-3 font-black text-lg ${item.renk}`}>
-                  {item.adim}
-                </div>
-                <h3 className="font-bold text-gray-900 text-sm mb-1">{item.baslik}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{item.aciklama}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── LGS Dersleri ── */}
-      <section className="py-16 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-black text-gray-900 mb-2">LGS&apos;deki 6 Ders</h2>
-            <p className="text-gray-500">Tüm dersler AI koç desteğiyle</p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {DERSLER.map((ders) => (
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                key={ders.key}
-                href={`/diagnostic?ders=${ders.key}`}
-                className="group relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all p-5"
+                href="/auth/register"
+                className="w-full sm:w-auto bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-8 py-4 rounded-full font-bold text-base shadow-xl shadow-violet-500/25 hover:shadow-violet-500/40 hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
               >
-                <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${ders.renk} rounded-t-2xl`} />
-                <div className="flex items-center gap-3 mb-3 pt-2">
-                  <span className="text-2xl">{ders.ikon}</span>
-                  <h3 className="font-bold text-gray-900 text-sm leading-tight">{ders.isim}</h3>
-                </div>
-                <p className="text-xs text-gray-500 mb-3">LGS&apos;de <span className="font-semibold">{ders.soru} soru</span></p>
-                <span className="text-xs font-semibold text-violet-600 group-hover:underline">
-                  Seviyeni ölç →
-                </span>
+                Hemen Başla — Ücretsiz <ArrowRight className="w-5 h-5" />
               </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+              <Link
+                href="/diagnostic"
+                className="w-full sm:w-auto glass text-foreground px-8 py-4 rounded-full font-semibold text-base hover:bg-foreground/5 transition-all"
+              >
+                Seviyemi Ölç
+              </Link>
+            </motion.div>
+          </motion.div>
+        </section>
 
-      {/* ── Özellikler ── */}
-      <section className="py-16 px-6 bg-slate-50 border-t border-gray-100">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-black text-gray-900 mb-2">Rakiplerde Olmayan 6 Özellik</h2>
-            <p className="text-gray-500">Sadece soru bankası değil — gerçek bir AI koç</p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {OZELLIKLER.map((o) => (
-              <div key={o.baslik} className={`rounded-2xl border p-5 ${o.renk}`}>
-                <p className="text-2xl mb-2">{o.ikon}</p>
-                <p className="font-bold text-gray-900 mb-1 text-sm">{o.baslik}</p>
-                <p className="text-xs text-gray-600 leading-relaxed">{o.aciklama}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        {/* ── İstatistikler / LGS Dersleri ── */}
+        <section className="px-6 mb-32 max-w-6xl mx-auto relative z-10">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={staggerContainer}
+            className="grid grid-cols-2 md:grid-cols-6 gap-4"
+          >
+            {DERSLER.map((ders) => {
+              const IconComp = ders.icon;
+              return (
+                <motion.div 
+                  key={ders.key} 
+                  variants={fadeInUp}
+                  className="glass-panel p-5 rounded-2xl flex flex-col items-center justify-center text-center hover:-translate-y-2 transition-transform duration-300 group cursor-pointer"
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${ders.bg} transition-colors group-hover:scale-110 duration-300`}>
+                    <IconComp className={`w-6 h-6 ${ders.color}`} />
+                  </div>
+                  <h3 className="font-bold text-sm mb-1">{ders.isim}</h3>
+                  <p className="text-xs text-foreground/50">{ders.soru} Soru</p>
+                </motion.div>
+              )
+            })}
+          </motion.div>
+        </section>
 
-      {/* ── CTA Banner ── */}
-      <section className="py-16 px-6 bg-gradient-to-br from-violet-600 to-indigo-700 text-white">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-black mb-4">
-            LGS&apos;ye hazırlanmaya başla
-          </h2>
-          <p className="text-violet-200 mb-8 text-lg">
-            Ücretsiz seviye testi ile başla. Hedef okuluna kaç günde hazır olduğunu öğren.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/auth/register"
-              className="bg-white text-violet-700 px-8 py-4 rounded-2xl font-bold hover:bg-violet-50 transition-colors shadow-lg"
+        {/* ── Özel Tasarım Özellikler (Bento Grid) ── */}
+        <section className="px-6 mb-32">
+          <div className="max-w-6xl mx-auto">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center mb-16"
             >
-              Ücretsiz Kayıt Ol →
-            </Link>
-            <Link
-              href="/auth/login"
-              className="border-2 border-white/40 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-white/10 transition-colors"
-            >
-              Giriş Yap
-            </Link>
+              <h2 className="text-3xl md:text-5xl font-black mb-4">Sadece Soru Değil, <span className="text-gradient">Strateji</span></h2>
+              <p className="text-foreground/60 max-w-2xl mx-auto">Sıradan test kitaplarının aksine, zayıf yanlarını öğrenen bir sistem.</p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {OZELLIKLER.map((ozellik, i) => {
+                const Icon = ozellik.icon;
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    className="glass-panel rounded-3xl p-8 relative overflow-hidden group"
+                  >
+                    <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${ozellik.gradient} opacity-20 blur-3xl rounded-full group-hover:opacity-40 transition-opacity`} />
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${ozellik.gradient} flex items-center justify-center mb-6 shadow-lg`}>
+                      <Icon className="w-7 h-7 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-3">{ozellik.baslik}</h3>
+                    <p className="text-foreground/70 leading-relaxed">{ozellik.aciklama}</p>
+                  </motion.div>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* ── Nasıl Çalışır ── */}
+        <section className="px-6 mb-32 relative">
+          <div className="max-w-6xl mx-auto relative z-10 glass-panel rounded-[2.5rem] p-8 md:p-16">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-black mb-4">4 Adımda Zafere Ulaş</h2>
+            </div>
+            
+            <div className="grid md:grid-cols-4 gap-8">
+              {NASIL.map((adim, i) => (
+                <div key={adim.adim} className="relative">
+                  {i !== 3 && <div className="hidden md:block absolute top-8 left-[60%] w-[100%] h-[2px] bg-gradient-to-r from-violet-500/20 to-transparent" />}
+                  <div className="w-16 h-16 rounded-2xl bg-foreground/5 flex items-center justify-center mb-6 text-2xl font-black text-violet-500 border border-foreground/10">
+                    {adim.adim}
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">{adim.baslik}</h3>
+                  <p className="text-sm text-foreground/60">{adim.aciklama}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+      </main>
 
       {/* ── Footer ── */}
-      <footer className="bg-gray-950 text-gray-500 py-8 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-violet-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-[9px] font-black">LGS</span>
+      <footer className="border-t border-foreground/10 bg-background/50 backdrop-blur pb-8 pt-12 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-foreground rounded-lg flex items-center justify-center">
+              <span className="text-background text-[10px] font-black tracking-widest">LGS</span>
             </div>
-            <span className="text-sm font-medium text-gray-400">AI Koçu</span>
+            <span className="font-bold tracking-tight">AI Koçu</span>
           </div>
-          <p className="text-xs">Yapay zeka destekli kişiselleştirilmiş LGS hazırlık platformu</p>
-          <div className="flex items-center gap-4 text-xs">
-            <Link href="/auth/login" className="hover:text-gray-300 transition-colors">Giriş</Link>
-            <Link href="/auth/register" className="hover:text-gray-300 transition-colors">Kayıt</Link>
+          <p className="text-sm text-foreground/50 text-center">
+            &copy; {new Date().getFullYear()} LGS AI Koçu. Tüm hakları gizlidir.
+          </p>
+          <div className="flex gap-6 text-sm font-medium">
+            <Link href="/auth/login" className="text-foreground/60 hover:text-foreground transition-colors">Giriş Yap</Link>
+            <Link href="/auth/register" className="text-foreground/60 hover:text-foreground transition-colors">Kayıt Ol</Link>
           </div>
         </div>
       </footer>

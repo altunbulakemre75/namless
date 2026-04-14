@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { trpc } from "../../../lib/trpc";
 import { createClient } from "../../../lib/supabase/client";
 import SidebarLayout from "../../components/SidebarLayout";
+import { motion } from "framer-motion";
+import {
+  BookOpen, Calculator, Beaker, Globe, Sparkles, Zap,
+  Flame, Target, CalendarDays, BarChart2, Clock, CheckCircle2,
+  Brain, ArrowRight, Play, BookMarked, Trophy
+} from "lucide-react";
 
 // ─── Sabitler ───────────────────────────────────────────────────────────────
 
@@ -19,9 +25,9 @@ const DERS_ISIM: Record<string, string> = {
   SOSYAL: "Sosyal Bilgiler", DIN: "Din Kültürü", INGILIZCE: "İngilizce",
 };
 
-const DERS_IKON: Record<string, string> = {
-  MATEMATIK: "📐", FEN: "🔬", TURKCE: "📖",
-  SOSYAL: "🌍", DIN: "☪️", INGILIZCE: "🇬🇧",
+const DERS_IKON: Record<string, any> = {
+  MATEMATIK: Calculator, FEN: Beaker, TURKCE: BookOpen,
+  SOSYAL: Globe, DIN: Sparkles, INGILIZCE: Zap,
 };
 
 const DERS_HEX: Record<string, string> = {
@@ -33,22 +39,13 @@ const DERS_HEX: Record<string, string> = {
   INGILIZCE: "#8b5cf6",
 };
 
-const DERS_BG: Record<string, string> = {
-  MATEMATIK: "bg-indigo-50 border-indigo-100",
-  FEN:       "bg-emerald-50 border-emerald-100",
-  TURKCE:    "bg-red-50 border-red-100",
-  SOSYAL:    "bg-orange-50 border-orange-100",
-  DIN:       "bg-teal-50 border-teal-100",
-  INGILIZCE: "bg-violet-50 border-violet-100",
-};
-
-const DERS_TEXT: Record<string, string> = {
-  MATEMATIK: "text-indigo-700",
-  FEN:       "text-emerald-700",
-  TURKCE:    "text-red-700",
-  SOSYAL:    "text-orange-700",
-  DIN:       "text-teal-700",
-  INGILIZCE: "text-violet-700",
+const DERS_COLOR_CLASS: Record<string, string> = {
+  MATEMATIK: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+  FEN:       "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+  TURKCE:    "text-rose-500 bg-rose-500/10 border-rose-500/20",
+  SOSYAL:    "text-orange-500 bg-orange-500/10 border-orange-500/20",
+  DIN:       "text-teal-500 bg-teal-500/10 border-teal-500/20",
+  INGILIZCE: "text-violet-500 bg-violet-500/10 border-violet-500/20",
 };
 
 function calculateWeightedAverage(dersMastery: Record<string, number>): number | null {
@@ -68,18 +65,18 @@ function calculateWeightedAverage(dersMastery: Record<string, number>): number |
 // ─── SVG Halka İlerleme ─────────────────────────────────────────────────────
 
 function ProgressRing({ pct, color, size = 64 }: { pct: number; color: string; size?: number }) {
-  const stroke = 6;
+  const stroke = 5;
   const r = (size - stroke * 2) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - Math.min(100, Math.max(0, pct)) / 100);
   const cx = size / 2, cy = size / 2;
   return (
     <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" className="text-foreground/10" strokeWidth={stroke} />
       <circle
         cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={stroke}
         strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-        style={{ transition: "stroke-dashoffset 0.6s ease" }}
+        style={{ transition: "stroke-dashoffset 1s ease-out" }}
       />
     </svg>
   );
@@ -87,75 +84,58 @@ function ProgressRing({ pct, color, size = 64 }: { pct: number; color: string; s
 
 // ─── Ders Kartı ─────────────────────────────────────────────────────────────
 
-function SubjectCard({
-  ders,
-  skor,
-  topicId,
-}: {
-  ders: string;
-  skor: number | undefined;
-  topicId?: string;
-}) {
+function SubjectCard({ ders, skor, topicId }: { ders: string; skor: number | undefined; topicId?: string; }) {
   const hasMastery = skor !== undefined;
   const displaySkor = hasMastery ? skor : 0;
   const color = DERS_HEX[ders] ?? "#94a3b8";
-  const bg = DERS_BG[ders] ?? "bg-gray-50 border-gray-100";
-  const textColor = DERS_TEXT[ders] ?? "text-gray-700";
+  const iconClass = DERS_COLOR_CLASS[ders] || "text-foreground bg-foreground/10 border-foreground/20";
+  const IconComp = DERS_IKON[ders];
 
   return (
     <Link
       href={topicId ? `/calis?topicId=${topicId}` : `/konular`}
-      className={`relative flex flex-col items-center gap-3 p-4 rounded-2xl border ${bg} hover:shadow-md transition-all duration-200 group`}
+      className={`relative flex flex-col items-center gap-4 p-5 rounded-3xl glass-panel hover:-translate-y-2 group transition-all duration-300 border border-transparent hover:border-foreground/10 overflow-hidden`}
     >
-      {/* Ring + icon */}
-      <div className="relative">
-        <ProgressRing pct={displaySkor} color={color} size={72} />
-        <span className="absolute inset-0 flex items-center justify-center text-xl" style={{ transform: "rotate(0deg)" }}>
-          {DERS_IKON[ders]}
-        </span>
+      <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300`} style={{ backgroundColor: color }} />
+      
+      <div className="relative flex items-center justify-center">
+        <ProgressRing pct={displaySkor} color={color} size={84} />
+        <div className={`absolute inset-0 m-auto w-12 h-12 rounded-full flex items-center justify-center ${iconClass}`}>
+          {IconComp && <IconComp className="w-5 h-5" />}
+        </div>
       </div>
 
-      {/* Label */}
       <div className="text-center">
-        <p className="text-xs font-bold text-gray-800 leading-tight">{DERS_ISIM[ders]}</p>
+        <p className="text-sm font-bold leading-tight mb-1">{DERS_ISIM[ders]}</p>
         {hasMastery ? (
-          <p className={`text-sm font-black ${textColor}`}>%{skor}</p>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-xl font-black tracking-tight" style={{ color }}>%{skor}</span>
+            <span className="text-[10px] text-foreground/50 uppercase font-bold tracking-wider mt-1">Ustalık</span>
+          </div>
         ) : (
-          <p className="text-xs text-gray-400">Başlanmadı</p>
+           <span className="text-[10px] px-2 py-0.5 rounded-full bg-foreground/5 text-foreground/60 font-semibold border border-foreground/10">Başlanmadı</span>
         )}
       </div>
-
-      {/* Hover CTA */}
-      <span className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400">
-        →
-      </span>
     </Link>
   );
 }
 
 // ─── Stat Kartı ─────────────────────────────────────────────────────────────
 
-function StatCard({
-  label,
-  value,
-  sub,
-  color = "text-gray-900",
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  color?: string;
-  icon?: string;
-}) {
+function StatCard({ label, value, sub, colorClass, icon: Icon }: { label: string; value: string | number; sub?: string; colorClass: string; icon: any; }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-      <div className="flex items-start justify-between mb-1">
-        <p className="text-xs text-gray-500 font-medium">{label}</p>
-        {icon && <span className="text-lg">{icon}</span>}
+    <div className="glass-panel rounded-3xl p-5 relative overflow-hidden group">
+      <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform ${colorClass}`}>
+         <Icon className="w-16 h-16 mr-[-20px] mt-[-20px]" />
       </div>
-      <p className={`text-2xl font-black ${color}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${colorClass.replace('text-', 'bg-').replace('-500', '-500/20')} ${colorClass}`}>
+          <Icon className="w-4 h-4" />
+        </div>
+        <p className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">{label}</p>
+      </div>
+      <p className="text-3xl font-black mb-1 tracking-tight">{value}</p>
+      {sub && <p className="text-xs text-foreground/50 font-medium">{sub}</p>}
     </div>
   );
 }
@@ -184,7 +164,6 @@ export default function DashboardClient({ userName }: Props) {
     router.refresh();
   };
 
-  // Ders bazında mastery
   const dersBazindaMastery: Record<string, number> = {};
   if (masteries) {
     const gruplar: Record<string, number[]> = {};
@@ -194,15 +173,12 @@ export default function DashboardClient({ userName }: Props) {
       gruplar[ders].push(m.skor);
     });
     Object.entries(gruplar).forEach(([ders, skorlar]) => {
-      dersBazindaMastery[ders] = Math.round(
-        skorlar.reduce((s, x) => s + x, 0) / skorlar.length
-      );
+      dersBazindaMastery[ders] = Math.round(skorlar.reduce((s, x) => s + x, 0) / skorlar.length);
     });
   }
 
   const genelOrtalama = calculateWeightedAverage(dersBazindaMastery);
 
-  // LGS hesabı
   const lgs = new Date("2026-06-07");
   const kalanGun = Math.max(0, Math.ceil((lgs.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 
@@ -215,301 +191,231 @@ export default function DashboardClient({ userName }: Props) {
   const haftaDk = studyStats?.haftalikDk ?? 0;
   const oturumSayisi = studyStats?.oturumSayisi ?? 0;
 
-  // Hedef okul banner durumu
-  const hazirGun = tahminiTarih
-    ? Math.max(0, Math.ceil((new Date(tahminiTarih).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : null;
+  const hazirGun = tahminiTarih ? Math.max(0, Math.ceil((new Date(tahminiTarih).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
   const yetisir = hazirGun !== null ? hazirGun <= kalanGun : true;
 
-  // Ad (ilk kelime)
   const firstName = userName.split(" ")[0];
+
+  const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
 
   return (
     <SidebarLayout userName={userName} onLogout={cikisYap}>
-      <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto w-full">
-
+      <div className="px-4 md:px-8 py-8 max-w-[1200px] mx-auto w-full space-y-8">
+        
         {/* ── Hoş Geldin Başlığı ── */}
-        <div className="flex items-center justify-between mb-6">
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-gray-900">
-              Merhaba, {firstName}! 👋
+            <h1 className="text-3xl md:text-4xl font-black mb-2 tracking-tight">
+              Merhaba, <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-500">{firstName}!</span> 👋
             </h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              LGS&apos;ye <span className="font-semibold text-violet-600">{kalanGun} gün</span> kaldı — bugün de çalışıyoruz!
+            <p className="text-foreground/60 text-sm font-medium">
+              LGS'ye <span className="font-bold text-violet-600 dark:text-violet-400">{kalanGun} gün</span> kaldı. Hedefine giden adımları atmaya devam et.
             </p>
           </div>
           {streak > 0 && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3 flex items-center gap-2 shrink-0">
-              <span className="text-2xl">🔥</span>
-              <div>
-                <p className="text-xl font-black text-orange-700 leading-none">{streak}</p>
-                <p className="text-xs text-orange-500 font-medium">gün seri</p>
+            <div className="glass-panel px-5 py-3 rounded-2xl flex items-center gap-3 border-orange-500/20 shrink-0">
+               <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                 <Flame className="w-6 h-6 text-orange-500 shrink-0" />
+               </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-orange-600 dark:text-orange-500 leading-none">{streak} <span className="text-xs opacity-60">GÜN</span></span>
+                <span className="text-[10px] font-bold text-orange-600/70 uppercase tracking-widest mt-0.5">Ateş Serisi</span>
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
 
-        {/* ── Hedef Okul / LGS Banner ── */}
-        {hedefOkul ? (
-          <div
-            className={`rounded-3xl p-5 mb-6 text-white ${
-              yetisir
-                ? "bg-gradient-to-br from-violet-600 to-indigo-700"
-                : "bg-gradient-to-br from-amber-500 to-orange-600"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold opacity-75 uppercase tracking-wider mb-1">Hedef Okul</p>
-                <p className="text-lg font-black truncate">{hedefOkul.isim}</p>
-                <p className="text-sm opacity-75">{hedefOkul.sehir} · Taban: {hedefOkul.minPuan} puan</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs opacity-75 mb-1">
-                  {yetisir ? "Yetişirsin ✓" : "Hızlan!"}
-                </p>
-                <p className="text-4xl font-black leading-none">{kalanGun}</p>
-                <p className="text-sm opacity-75">gün kaldı</p>
-                {hazirGun !== null && (
-                  <p className="text-xs opacity-60 mt-1">
-                    Tahmini hazırlık: {hazirGun} gün
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <Link
-            href="/hedef-okul"
-            className="flex items-center gap-4 bg-white border-2 border-dashed border-violet-300 rounded-3xl p-5 mb-6 hover:border-violet-500 hover:bg-violet-50 transition-all group"
-          >
-            <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-violet-200 transition-colors">
-              🎯
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-violet-900">Hedef Okul Belirle</p>
-              <p className="text-sm text-violet-500">Kaç günde hazır olduğunu hesaplayalım</p>
-            </div>
-            <span className="text-violet-400 text-xl font-bold">→</span>
-          </Link>
-        )}
-
-        {/* ── Hızlı İstatistikler ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <StatCard
-            label="LGS'ye Kalan"
-            value={kalanGun}
-            sub="gün"
-            color="text-violet-600"
-            icon="📅"
-          />
-          <StatCard
-            label="LGS Başarı"
-            value={genelOrtalama !== null ? `%${genelOrtalama}` : "—"}
-            sub="90 soruda ağırlıklı"
-            color="text-emerald-600"
-            icon="📈"
-          />
-          <StatCard
-            label="Bugün"
-            value={bugunDk > 0 ? `${bugunDk} dk` : "—"}
-            sub={haftaDk > 0 ? `Hafta: ${haftaDk} dk` : "Henüz çalışılmadı"}
-            color="text-blue-600"
-            icon="⏱️"
-          />
-          <StatCard
-            label="Oturum"
-            value={oturumSayisi > 0 ? oturumSayisi : (streak > 0 ? `${streak}🔥` : "—")}
-            sub={oturumSayisi > 0 ? "tamamlanan" : "ardışık gün"}
-            color="text-orange-600"
-            icon={oturumSayisi > 0 ? "✅" : "🔥"}
-          />
-        </div>
-
-        {/* ── Bugünün Görevi ── */}
-        {!masteriesLoading && (!masteries || masteries.length === 0) ? (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 mb-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">📊</span>
-              <div>
-                <p className="font-bold text-blue-900">Seviyeni henüz belirlemedin</p>
-                <p className="text-sm text-blue-600">Seviyeni belirle, kişisel çalışma planın oluşturulsun.</p>
+        {/* ── Hedef Okul Banner ── */}
+        <motion.div initial="hidden" animate="visible" variants={fadeUp}>
+          {hedefOkul ? (
+            <div className={`relative overflow-hidden rounded-3xl p-6 md:p-8 text-white shadow-2xl ${yetisir ? "bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-700" : "bg-gradient-to-br from-amber-500 via-orange-500 to-red-600"}`}>
+              <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-[100px] rounded-full mix-blend-overlay pointer-events-none" />
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shrink-0">
+                    <Target className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">Hedef Okul</h2>
+                    <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-1">{hedefOkul.isim}</h3>
+                    <p className="text-sm opacity-80 flex items-center gap-2">
+                       {hedefOkul.sehir} <span className="w-1 h-1 bg-white/50 rounded-full" /> Taban: {hedefOkul.minPuan}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex bg-black/20 backdrop-blur-md rounded-2xl p-4 gap-6 shrink-0 w-full md:w-auto">
+                  <div className="border-r border-white/20 pr-6">
+                     <p className="text-xs opacity-70 uppercase tracking-wider font-semibold mb-1">Durum</p>
+                     <p className="text-sm font-bold flex items-center gap-1.5">{yetisir ? <><CheckCircle2 className="w-4 h-4 text-green-400" /> Yetişir</> : <><Flame className="w-4 h-4 text-orange-400" /> Geridesin</>}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs opacity-70 uppercase tracking-wider font-semibold mb-1">Tahmin</p>
+                    <p className="text-2xl font-black leading-none">{hazirGun !== null ? hazirGun : "?"} <span className="text-xs opacity-70">gün</span></p>
+                  </div>
+               </div>
               </div>
             </div>
-            <Link
-              href="/diagnostic"
-              className="shrink-0 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors"
-            >
-              Seviye Belirle →
-            </Link>
-          </div>
-        ) : bugunTopicId ? (
-          <Link
-            href={`/calis?topicId=${bugunTopicId}`}
-            className="flex items-center gap-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl p-5 mb-6 hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg group"
-          >
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">
-              🤖
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold opacity-75 uppercase tracking-wider">Bugünün Görevi</p>
-              <p className="font-bold text-lg">Koç Döngüsünü Başlat</p>
-              <p className="text-sm opacity-75">Planındaki konuya git ve çalış</p>
-            </div>
-            <span className="text-2xl group-hover:translate-x-1 transition-transform">→</span>
-          </Link>
-        ) : (
-          <Link
-            href="/konular"
-            className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl p-5 mb-6 hover:border-violet-300 hover:shadow-md transition-all group"
-          >
-            <div className="w-12 h-12 bg-violet-50 rounded-2xl flex items-center justify-center text-2xl">
-              📚
-            </div>
-            <div className="flex-1">
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-0.5">Serbest Çalışma</p>
-              <p className="font-bold text-gray-900 text-lg">Konu Seç ve Çalış</p>
-              <p className="text-sm text-gray-500">İstediğin konuyu seç, AI koçun anlatsın</p>
-            </div>
-            <span className="text-xl text-gray-300 group-hover:text-violet-500 group-hover:translate-x-1 transition-all">→</span>
-          </Link>
-        )}
-
-        {/* ── Ders İlerleme Kartları ── */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-gray-900 text-base">Ders İlerlemesi</h2>
-            <Link href="/konular" className="text-xs text-violet-600 font-semibold hover:underline">
-              Tümünü gör →
-            </Link>
-          </div>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-            {DERS_SIRA.map((ders) => (
-              <SubjectCard
-                key={ders}
-                ders={ders}
-                skor={dersBazindaMastery[ders]}
-                topicId={bugunTopicId ?? undefined}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* ── AI Koç Yorumu ── */}
-        {coachComment && (
-          <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl p-5 mb-6">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-violet-600 rounded-2xl flex items-center justify-center text-xl shrink-0">
-                🤖
+          ) : (
+            <Link href="/hedef-okul" className="flex items-center gap-5 glass-panel border-dashed border-2 border-violet-500/30 rounded-3xl p-6 md:p-8 hover:border-violet-500/60 hover:bg-violet-500/5 transition-all group">
+              <div className="w-14 h-14 bg-violet-500/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Target className="w-7 h-7 text-violet-500" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-violet-900 mb-1">AI Koç Yorumu</p>
-                <p className="text-sm text-violet-700 leading-relaxed">{coachComment.yorum}</p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-violet-400">
-                  {coachComment.toplamSoru > 0 && (
-                    <span>Bu hafta {coachComment.toplamSoru} soru · %{Math.round(coachComment.dogruOrani * 100)} doğru</span>
-                  )}
-                  {coachComment.streak > 0 && <span>🔥 {coachComment.streak} gün seri</span>}
+                <h3 className="text-xl font-bold mb-1">Hedef Okulunu Belirle</h3>
+                <p className="text-sm text-foreground/60">Yapay zeka, hedefine giden en kısa yolu hesaplasın.</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center shadow-lg group-hover:w-12 transition-all">
+                <ArrowRight className="w-5 h-5 text-background" />
+              </div>
+            </Link>
+          )}
+        </motion.div>
+
+        {/* ── İstatistikler ── */}
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="LGS'ye" value={kalanGun} sub="Gün Kaldı" colorClass="text-violet-500" icon={CalendarDays} />
+          <StatCard label="Başarı Ort." value={genelOrtalama !== null ? `%${genelOrtalama}` : "—"} sub="90 soruda ağırlık" colorClass="text-emerald-500" icon={BarChart2} />
+          <StatCard label="Bugün" value={bugunDk > 0 ? `${bugunDk} dk` : "—"} sub={haftaDk > 0 ? `Hafta: ${haftaDk} dk` : "Henüz çalışılmadı"} colorClass="text-blue-500" icon={Clock} />
+          <StatCard label="Oturum" value={oturumSayisi > 0 ? oturumSayisi : "—"} sub={oturumSayisi > 0 ? "Tamamlanan" : "Seriye başla"} colorClass="text-orange-500" icon={CheckCircle2} />
+        </motion.div>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="md:col-span-2 space-y-8">
+            {/* ── Bugünün Görevi ── */}
+            <motion.div initial="hidden" animate="visible" variants={fadeUp} className="flex flex-col gap-4">
+               <h2 className="text-lg font-bold flex items-center gap-2 tracking-tight">
+                 <Zap className="w-5 h-5 text-yellow-500" /> Aksiyon Planı
+               </h2>
+               
+               {!masteriesLoading && (!masteries || masteries.length === 0) ? (
+                 <div className="glass-panel border-blue-500/20 bg-blue-500/5 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-blue-500/20 rounded-2xl flex items-center justify-center shrink-0">
+                         <Brain className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-lg mb-1">Test Çöz, Seviyeni Öğren</h3>
+                        <p className="text-sm text-foreground/70">AI koçun henüz zayıf noktalarını bilmiyor. Seviyeni belirleyerek planını oluştur.</p>
+                      </div>
+                    </div>
+                    <Link href="/diagnostic" className="w-full sm:w-auto whitespace-nowrap bg-blue-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:-translate-y-1 transition-transform inline-flex items-center justify-center gap-2">
+                       Seviye Belirle <ArrowRight className="w-5 h-5" />
+                    </Link>
+                 </div>
+               ) : bugunTopicId ? (
+                 <Link href={`/calis?topicId=${bugunTopicId}`} className="relative overflow-hidden group glass-panel rounded-3xl p-8 border-transparent hover:border-violet-500/30 transition-all shadow-xl hover:shadow-2xl">
+                    <div className="absolute inset-0 bg-gradient-to-r from-violet-600/5 to-indigo-600/5 z-0" />
+                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-violet-500/10 rounded-full blur-[40px] pointer-events-none group-hover:scale-150 transition-transform duration-700" />
+                    <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                       <div className="flex items-center gap-5">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                            <Play className="w-8 h-8 text-white ml-1" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 mb-1">Koç Döngüsü Başlat</p>
+                            <h3 className="text-2xl font-black mb-1">Sana Özel Bugünün Görevi</h3>
+                            <p className="text-sm text-foreground/60">Algoritma sıradaki geliştirmen gereken konuyu belirledi.</p>
+                          </div>
+                       </div>
+                       <div className="w-12 h-12 rounded-full border border-foreground/10 flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-colors self-end sm:self-auto">
+                         <ArrowRight className="w-5 h-5" />
+                       </div>
+                    </div>
+                 </Link>
+               ) : (
+                <Link href="/konular" className="relative overflow-hidden group glass-panel rounded-3xl p-8 transition-all hover:-translate-y-1">
+                  <div className="flex items-center gap-5">
+                      <div className="w-16 h-16 rounded-2xl bg-foreground/5 flex items-center justify-center">
+                        <BookMarked className="w-8 h-8 text-foreground/70" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold uppercase tracking-widest text-foreground/50 mb-1">Serbest Çalışma</p>
+                        <h3 className="text-xl font-bold mb-1">Konu Seç ve Çalış</h3>
+                        <p className="text-sm text-foreground/60">Dilediğin eksiğini yapay zeka ile kapat.</p>
+                      </div>
+                      <ArrowRight className="w-6 h-6 text-foreground/30 group-hover:text-foreground group-hover:translate-x-1 transition-all" />
+                  </div>
+                </Link>
+               )}
+            </motion.div>
+
+            {/* ── Ders İlerleme Kartları ── */}
+            <motion.div initial="hidden" animate="visible" variants={fadeUp}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold tracking-tight">Genel Durum</h2>
+                <Link href="/konular" className="text-sm font-semibold text-violet-500 hover:text-violet-600 flex items-center gap-1">
+                  Detay <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {DERS_SIRA.map((ders) => (
+                  <SubjectCard key={ders} ders={ders} skor={dersBazindaMastery[ders]} topicId={bugunTopicId ?? undefined} />
+                ))}
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="space-y-8">
+            {/* ── AI Koç Yorumu ── */}
+            {coachComment && (
+              <motion.div initial="hidden" animate="visible" variants={fadeUp} className="glass-panel rounded-3xl p-6 relative overflow-hidden border-violet-500/30 bg-violet-500/5">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/10 blur-[40px] pointer-events-none rounded-full" />
+                <div className="relative z-10 flex flex-col gap-4">
+                  <div className="flex items-center gap-3 border-b border-foreground/10 pb-4">
+                    <div className="w-10 h-10 bg-violet-600 rounded-xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-violet-500/20">
+                      <Brain className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold">AI Koç Analizi</h3>
+                      <p className="text-xs text-foreground/50">Haftalık Zeka Raporu</p>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-relaxed font-medium text-foreground/80">"{coachComment.yorum}"</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {coachComment.toplamSoru > 0 && (
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-white/50 dark:bg-black/30 border border-foreground/10 flex items-center gap-1.5">
+                        <PenTool className="w-3 h-3 text-violet-500" /> {coachComment.toplamSoru} Soru Çözümü
+                      </span>
+                    )}
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-white/50 dark:bg-black/30 border border-foreground/10 flex items-center gap-1.5">
+                        <Target className="w-3 h-3 text-emerald-500" /> %{Math.round(coachComment.dogruOrani * 100)} İsabet
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── Hızlı Aksiyonlar ── */}
+            <motion.div initial="hidden" animate="visible" variants={fadeUp}>
+              <h2 className="text-lg font-bold tracking-tight mb-4">Hızlı Erişim</h2>
+              <div className="flex flex-col gap-3">
+                <Link href="/deneme" className="glass-panel p-4 rounded-2xl flex items-center justify-between group hover:border-red-500/50 hover:bg-red-500/5 transition-all cursor-pointer">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <PenTool className="w-6 h-6" />
+                    </div>
+                    <div>
+                       <h4 className="font-bold text-sm mb-0.5">LGS Denemesi</h4>
+                       <p className="text-xs text-foreground/60">Simülasyon başlat</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-foreground/30 group-hover:text-red-500 transition-colors" />
+                </Link>
+                <div className="glass-panel p-4 rounded-2xl flex items-center justify-between group opacity-60 cursor-not-allowed">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center">
+                      <Trophy className="w-6 h-6" />
+                    </div>
+                    <div>
+                       <h4 className="font-bold text-sm mb-0.5">Rozet ve Başarılar</h4>
+                       <p className="text-xs text-foreground/60 mt-0.5"><span className="px-1.5 py-0.5 bg-foreground/10 rounded text-[9px] font-bold uppercase">Yakında</span></p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Hızlı Aksiyonlar ── */}
-        <div className="mb-6">
-          <h2 className="font-bold text-gray-900 text-base mb-3">Hızlı Erişim</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Link
-              href="/deneme"
-              className="flex flex-col items-center gap-2 bg-white border border-gray-100 rounded-2xl p-4 hover:shadow-md hover:border-red-200 transition-all text-center group"
-            >
-              <span className="text-3xl group-hover:scale-110 transition-transform">📝</span>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">Deneme Sınavı</p>
-                <p className="text-xs text-gray-400">LGS formatında</p>
-              </div>
-            </Link>
-            <Link
-              href="/konular"
-              className="flex flex-col items-center gap-2 bg-white border border-gray-100 rounded-2xl p-4 hover:shadow-md hover:border-blue-200 transition-all text-center group"
-            >
-              <span className="text-3xl group-hover:scale-110 transition-transform">📚</span>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">Konulara Göz At</p>
-                <p className="text-xs text-gray-400">Serbest çalışma</p>
-              </div>
-            </Link>
-            <div className="flex flex-col items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl p-4 text-center opacity-50 cursor-not-allowed">
-              <span className="text-3xl">📊</span>
-              <div>
-                <p className="font-semibold text-gray-500 text-sm">İstatistikler</p>
-                <p className="text-xs text-gray-400">Yakında</p>
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl p-4 text-center opacity-50 cursor-not-allowed">
-              <span className="text-3xl">🏆</span>
-              <div>
-                <p className="font-semibold text-gray-500 text-sm">Rozetler</p>
-                <p className="text-xs text-gray-400">Yakında</p>
-              </div>
-            </div>
+            </motion.div>
           </div>
         </div>
-
-        {/* ── Detaylı Konu Ustalığı ── */}
-        {masteries && masteries.length > 0 && (() => {
-          const dersBazinda = masteries.reduce((acc, m) => {
-            const ders = m.topic.ders;
-            if (!acc[ders]) acc[ders] = [];
-            acc[ders].push(m);
-            return acc;
-          }, {} as Record<string, typeof masteries>);
-
-          return (
-            <div>
-              <h2 className="font-bold text-gray-900 text-base mb-3">Konu Detayı</h2>
-              <div className="space-y-3">
-                {DERS_SIRA
-                  .filter((ders) => (dersBazinda[ders]?.length ?? 0) > 0)
-                  .map((ders) => {
-                    const konular = dersBazinda[ders];
-                    const color = DERS_HEX[ders] ?? "#94a3b8";
-                    return (
-                      <div key={ders} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="text-lg">{DERS_IKON[ders]}</span>
-                          <h3 className="font-bold text-sm text-gray-900">{DERS_ISIM[ders]}</h3>
-                          <span className="ml-auto text-xs text-gray-400 font-medium">
-                            {LGS_SORU_SAYISI[ders]} soru · Ort. %{dersBazindaMastery[ders] ?? "—"}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {konular.sort((a, b) => a.skor - b.skor).map((m) => (
-                            <div key={m.topicId} className="flex items-center gap-3">
-                              <span className="w-36 text-xs text-gray-600 truncate">{m.topic.isim}</span>
-                              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                                <div
-                                  className="h-1.5 rounded-full transition-all duration-500"
-                                  style={{
-                                    width: `${m.skor}%`,
-                                    backgroundColor: color,
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs font-bold w-8 text-right" style={{ color }}>
-                                %{Math.round(m.skor)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          );
-        })()}
       </div>
     </SidebarLayout>
   );
