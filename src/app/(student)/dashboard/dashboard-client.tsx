@@ -2,15 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { trpc } from "../../../lib/trpc";
 import { createClient } from "../../../lib/supabase/client";
 import SidebarLayout from "../../components/SidebarLayout";
+import AcilPlanModal from "../../components/AcilPlanModal";
 import { motion } from "framer-motion";
 import {
   BookOpen, Calculator, Beaker, Globe, Sparkles, Zap,
   Flame, Target, CalendarDays, BarChart2, Clock, CheckCircle2,
   Brain, ArrowRight, Play, BookMarked, Trophy, PenTool
 } from "lucide-react";
+
+import StudyTimer from "../../components/StudyTimer";
+import DailyTasks from "../../components/DailyTasks";
+
 
 // ─── Sabitler ───────────────────────────────────────────────────────────────
 
@@ -151,6 +157,7 @@ interface Props {
 
 export default function DashboardClient({ userName }: Props) {
   const router = useRouter();
+  const [acilPlanModalAcik, setAcilPlanModalAcik] = useState(false);
 
   const { data: masteries, isLoading: masteriesLoading } = trpc.assessment.getMasteries.useQuery();
   const { data: profile } = trpc.learning.getProfile.useQuery();
@@ -194,6 +201,14 @@ export default function DashboardClient({ userName }: Props) {
 
   const hazirGun = tahminiTarih ? Math.max(0, Math.ceil((new Date(tahminiTarih).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null;
   const yetisir = hazirGun !== null ? hazirGun <= kalanGun : true;
+
+  // Hedef okula yetişmek için gereken günlük çalışma süresi (dakika)
+  const mevcutGunlukDk = profile?.dailyStudyMins ?? 60;
+  const gerekliGunlukDk = !yetisir && hedefOkul && kalanGun > 0
+    ? Math.min(300, Math.max(60, Math.ceil(
+        ((hedefOkul.minPuan - (genelOrtalama ?? 30) * 5) / (kalanGun * 0.05)) + 30
+      )))
+    : mevcutGunlukDk;
 
   const firstName = userName.split(" ")[0];
 
@@ -244,15 +259,26 @@ export default function DashboardClient({ userName }: Props) {
                     </p>
                   </div>
                 </div>
-                <div className="flex bg-white/10 backdrop-blur-2xl border border-white/10 rounded-squircle p-5 gap-6 shrink-0 w-full md:w-auto shadow-sm">
-                  <div className="border-r border-white/20 pr-6">
-                     <p className="text-[10px] text-white/60 tracking-widest font-semibold mb-1 uppercase">Durum</p>
-                     <p className="text-sm font-bold flex items-center gap-1.5">{yetisir ? <><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Yetişir</> : <><Flame className="w-4 h-4 text-orange-400" /> Geridesin</>}</p>
+                <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto">
+                  <div className="flex bg-white/10 backdrop-blur-2xl border border-white/10 rounded-squircle p-5 gap-6 shadow-sm">
+                    <div className="border-r border-white/20 pr-6">
+                       <p className="text-[10px] text-white/60 tracking-widest font-semibold mb-1 uppercase">Durum</p>
+                       <p className="text-sm font-bold flex items-center gap-1.5">{yetisir ? <><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Yetişir</> : <><Flame className="w-4 h-4 text-orange-400" /> Geridesin</>}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/60 tracking-widest font-semibold mb-1 uppercase">Tahmin</p>
+                      <p className="text-2xl font-bold leading-none">{hazirGun !== null ? hazirGun : "?"} <span className="text-xs text-white/60 font-medium">gün</span></p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-white/60 tracking-widest font-semibold mb-1 uppercase">Tahmin</p>
-                    <p className="text-2xl font-bold leading-none">{hazirGun !== null ? hazirGun : "?"} <span className="text-xs text-white/60 font-medium">gün</span></p>
-                  </div>
+                  {!yetisir && (
+                    <button
+                      onClick={() => setAcilPlanModalAcik(true)}
+                      className="w-full bg-white text-orange-600 font-bold text-sm py-3 px-4 rounded-squircle hover:bg-orange-50 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <Zap className="w-4 h-4" />
+                      Acil Plan Oluştur
+                    </button>
+                  )}
                </div>
               </div>
             </div>
@@ -273,12 +299,13 @@ export default function DashboardClient({ userName }: Props) {
         </motion.div>
 
         {/* ── İstatistikler ── */}
-        <motion.div initial="hidden" animate="visible" variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <motion.div initial="hidden" animate="visible" variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="LGS'ye" value={kalanGun} sub="Gün Kaldı" colorClass="text-violet-500" icon={CalendarDays} />
           <StatCard label="Başarı Ort." value={genelOrtalama !== null ? `%${genelOrtalama}` : "—"} sub="90 soruda ağırlık" colorClass="text-emerald-500" icon={BarChart2} />
           <StatCard label="Bugün" value={bugunDk > 0 ? `${bugunDk} dk` : "—"} sub={haftaDk > 0 ? `Hafta: ${haftaDk} dk` : "Henüz çalışılmadı"} colorClass="text-blue-500" icon={Clock} />
           <StatCard label="Oturum" value={oturumSayisi > 0 ? oturumSayisi : "—"} sub={oturumSayisi > 0 ? "Tamamlanan" : "Seriye başla"} colorClass="text-orange-500" icon={CheckCircle2} />
         </motion.div>
+
 
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-8">
@@ -339,6 +366,12 @@ export default function DashboardClient({ userName }: Props) {
                )}
             </motion.div>
 
+            {/* ── Günlük Görevler ── */}
+            <motion.div initial="hidden" animate="visible" variants={fadeUp}>
+               <DailyTasks />
+            </motion.div>
+
+
             {/* ── Ders İlerleme Kartları ── */}
             <motion.div initial="hidden" animate="visible" variants={fadeUp}>
               <div className="flex items-center justify-between mb-4">
@@ -385,6 +418,12 @@ export default function DashboardClient({ userName }: Props) {
               </motion.div>
             )}
 
+            {/* ── Odak Sayacı (Pomodoro) ── */}
+            <motion.div initial="hidden" animate="visible" variants={fadeUp}>
+              <StudyTimer />
+            </motion.div>
+
+
             {/* ── Hızlı Aksiyonlar ── */}
             <motion.div initial="hidden" animate="visible" variants={fadeUp}>
               <h2 className="text-lg font-bold tracking-tight mb-4">Hızlı Erişim</h2>
@@ -419,6 +458,15 @@ export default function DashboardClient({ userName }: Props) {
           </div>
         </div>
       </div>
+
+      {acilPlanModalAcik && hedefOkul && (
+        <AcilPlanModal
+          kalanGun={kalanGun}
+          onerilDakika={gerekliGunlukDk}
+          mevcutDakika={mevcutGunlukDk}
+          onClose={() => setAcilPlanModalAcik(false)}
+        />
+      )}
     </SidebarLayout>
   );
 }

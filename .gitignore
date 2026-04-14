@@ -40,3 +40,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# E2E auth state
+/e2e/.auth-state.json
+/e2e/.auth-credentials.json
+/e2e/.auth-failed.marker

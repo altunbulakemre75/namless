@@ -160,7 +160,7 @@ export const learningRouter = router({
 
   // Sprint 6: Deneme sinavi olustur
   createMockExam: protectedProcedure
-    .input(z.object({ stressModu: z.boolean().default(false) }))
+    .input(z.object({ stressModu: z.boolean().default(false), tamMod: z.boolean().default(true) }))
     .mutation(async ({ ctx, input }) => {
       const sorular = await ctx.prisma.question.findMany({
         where: { validationStatus: "PUBLISHED" },
@@ -174,15 +174,20 @@ export const learningRouter = router({
         dersGruplari.get(d)!.push(q);
       });
 
+      // LGS gerçek soru dağılımı — mevcut soru sayısıyla sınırla
+      const lgsHedef: Record<string, number> = input.tamMod
+        ? { TURKCE: 20, MATEMATIK: 20, FEN: 20, SOSYAL: 10, INGILIZCE: 10, DIN: 10 }
+        : { TURKCE: 4, MATEMATIK: 4, FEN: 4, SOSYAL: 2, INGILIZCE: 2, DIN: 2 };
+
       const secilenIds: string[] = [];
-      const lgsOranlar: Record<string, number> = {
-        TURKCE: 5, MATEMATIK: 5, FEN: 5, SOSYAL: 3, INGILIZCE: 1, DIN: 1,
-      };
+      const dersSoruSayisi: Record<string, number> = {};
 
       dersGruplari.forEach((dsSorular, ders) => {
-        const hedef = lgsOranlar[ders] ?? 2;
+        const hedef = lgsHedef[ders] ?? 2;
         const karisik = [...dsSorular].sort(() => Math.random() - 0.5);
-        secilenIds.push(...karisik.slice(0, hedef).map((q) => q.id));
+        const secilen = karisik.slice(0, hedef);
+        secilenIds.push(...secilen.map((q) => q.id));
+        dersSoruSayisi[ders] = secilen.length;
       });
 
       const exam = await ctx.prisma.mockExam.create({
@@ -194,8 +199,15 @@ export const learningRouter = router({
         },
       });
 
+      // LGS sırası: Türkçe → Matematik → Fen → Sosyal → Din → İngilizce
+      const DERS_SIRA = ["TURKCE", "MATEMATIK", "FEN", "SOSYAL", "DIN", "INGILIZCE"];
       const secilenSorular = sorular
         .filter((q) => secilenIds.includes(q.id))
+        .sort((a, b) => {
+          const ai = DERS_SIRA.indexOf(a.topic.ders);
+          const bi = DERS_SIRA.indexOf(b.topic.ders);
+          return ai !== bi ? ai - bi : 0;
+        })
         .map((q) => ({
           id: q.id,
           ders: q.topic.ders,
@@ -203,15 +215,16 @@ export const learningRouter = router({
           soruMetni: q.soruMetni,
           siklar: q.siklar,
           zorluk: q.zorluk,
-          // dogruSik client'a gönderilmiyor — server-side kontrol edilecek
         }));
 
       return {
         examId: exam.id,
         stressModu: input.stressModu,
+        tamMod: input.tamMod,
         toplamSoru: secilenIds.length,
-        sureDakika: input.stressModu ? Math.ceil(secilenIds.length * 1.5) : 0,
+        sureDakika: input.stressModu ? (input.tamMod ? 130 : 30) : 0,
         sorular: secilenSorular,
+        dersSoruSayisi,
       };
     }),
 
@@ -273,7 +286,22 @@ export const learningRouter = router({
         data: { bitisTarihi: new Date(), dogruSayisi: dogru, yanlisSayisi: yanlis, bosSayisi: bos, netPuan: net, kocYorumu },
       });
 
-      return { net, kocYorumu, zayifDersler, dersBazinda };
+      // YEP puan tahmini: gerçek LGS'de 90 soruymuş gibi normalize et
+      const LGS_SORU: Record<string, number> = { TURKCE: 20, MATEMATIK: 20, FEN: 20, SOSYAL: 10, INGILIZCE: 10, DIN: 10 };
+      let tahminiDogru = 0;
+      let toplamAgirlik = 0;
+      for (const [ders, { dogru: d, toplam: t }] of Object.entries(dersBazinda)) {
+        if (t > 0) {
+          const oran = d / t;
+          tahminiDogru += oran * (LGS_SORU[ders] ?? 0);
+          toplamAgirlik += LGS_SORU[ders] ?? 0;
+        }
+      }
+      const yepPuan = toplamAgirlik > 0
+        ? Math.min(500, Math.round(100 + (tahminiDogru / 90) * 400))
+        : null;
+
+      return { net, kocYorumu, zayifDersler, dersBazinda, yepPuan };
     }),
 
   // Sprint 5: Konu listesi (serbest mod)
@@ -391,6 +419,53 @@ export const learningRouter = router({
         },
       });
       return { planOlusturuldu: true, konuSayisi: oncelikliKonular.length };
+    }),
+
+  // LGS'ye yetişecek acil plan oluştur
+  regeneratePlan: protectedProcedure
+    .input(z.object({ gunlukDakika: z.number().min(30).max(300) }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+
+      const masteries = await ctx.prisma.mastery.findMany({ where: { userId } });
+      if (masteries.length === 0) return { planId: null, olusturulanSessionSayisi: 0, gunlukDakika: input.gunlukDakika };
+
+      // Eski planı sil
+      await ctx.prisma.studyPlan.deleteMany({ where: { userId } });
+
+      // LGS tarihine odaklı yeni plan üret
+      const planData = planGenerator.generate({
+        userId,
+        masteries,
+        hedefTarih: LGS_TARIHI,
+        gunlukDakika: input.gunlukDakika,
+      });
+
+      const created = await ctx.prisma.studyPlan.create({
+        data: {
+          userId,
+          hedefTarih: planData.hedefTarih,
+          gunlukDakika: planData.gunlukDakika,
+          planVersiyonu: planData.planVersiyonu,
+          sessions: {
+            create: planData.sessions.slice(0, 60).map((s) => ({
+              tarih: s.tarih,
+              hedefTopicIds: s.hedefTopicIds,
+              tahminiSure: s.tahminiSure,
+              durum: s.durum,
+              attemptIds: [],
+            })),
+          },
+        },
+      });
+
+      // Kullanıcının günlük süresini güncelle
+      await ctx.prisma.user.update({
+        where: { id: userId },
+        data: { dailyStudyMins: input.gunlukDakika },
+      });
+
+      return { planId: created.id, olusturulanSessionSayisi: planData.sessions.length, gunlukDakika: input.gunlukDakika };
     }),
 
   // Sure kaydet
@@ -652,6 +727,58 @@ export const learningRouter = router({
 
     return null;
   }),
+
+  // Takvim: çalışma planı oturumları (60 gün ileriye)
+  getStudyCalendar: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+    const plan = await ctx.prisma.studyPlan.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        sessions: {
+          orderBy: { tarih: "asc" },
+          take: 60,
+          include: { studyPlan: { select: { gunlukDakika: true } } },
+        },
+      },
+    });
+
+    if (!plan) return { sessions: [], gunlukDakika: 60 };
+
+    const sessions = await Promise.all(
+      plan.sessions.map(async (s) => {
+        const topics = s.hedefTopicIds.length > 0
+          ? await ctx.prisma.topic.findMany({
+              where: { id: { in: s.hedefTopicIds } },
+              select: { id: true, isim: true, ders: true },
+            })
+          : [];
+        return {
+          id: s.id,
+          tarih: s.tarih,
+          durum: s.durum,
+          tahminiSure: s.tahminiSure,
+          konular: topics,
+        };
+      })
+    );
+
+    return { sessions, gunlukDakika: plan.gunlukDakika };
+  }),
+
+  // Oturumu tamamlandı olarak işaretle
+  completeSession: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.prisma.dailySession.findFirstOrThrow({
+        where: { id: input.sessionId, studyPlan: { userId: ctx.user.id } },
+      });
+      await ctx.prisma.dailySession.update({
+        where: { id: session.id },
+        data: { durum: "DONE" },
+      });
+      return { tamamlandi: true };
+    }),
 
   // ==================== FAZ 3: AI PROMPT ENGINE ENDPOINTS ====================
 

@@ -72,6 +72,22 @@ body {
   }
 }
 
+/* ios-glass: More refined version for specific headers */
+@utility ios-glass {
+  background-color: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border-bottom: 0.5px solid rgba(0,0,0,0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ios-glass {
+    background-color: rgba(28, 28, 30, 0.72);
+    border-bottom: 0.5px solid rgba(255,255,255,0.08);
+  }
+}
+
+
 /* APPLE CARDS (Minimalist, Elevated) */
 @utility ios-card {
   background-color: #ffffff;
@@ -100,3 +116,12 @@ body {
     background-image: linear-gradient(to right, #a78bfa, #60a5fa);
   }
 }
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
