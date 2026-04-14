@@ -39,14 +39,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  let body: { prompt?: string; topicId?: string; mode?: string };
+  let body: { prompt?: string; topicId?: string; mode?: string; imageBase64?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Geçersiz istek gövdesi" }, { status: 400 });
   }
 
-  const { prompt, mode } = body;
+  const { prompt, mode, imageBase64 } = body;
 
   if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
     return NextResponse.json({ error: "Prompt boş olamaz" }, { status: 400 });
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         if (config.provider === "gemini") {
           // Gemini stream — hata durumunda Claude Haiku'ya düş
           let geminiSuccess = false;
-          const gen = callGeminiStream(sanitized, config);
+          const gen = callGeminiStream(sanitized, config, undefined, imageBase64);
           for await (const chunk of gen) {
             if (chunk === "[GEMINI_ERROR]") break; // fallback'e geç
             geminiSuccess = true;

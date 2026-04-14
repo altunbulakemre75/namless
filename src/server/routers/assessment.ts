@@ -178,6 +178,51 @@ export const assessmentRouter = router({
       return { streak: yeniStreak, enUzun };
     }),
 
+  // Hata defteri — yanlış cevaplanan benzersiz sorular
+  getHataDefteri: protectedProcedure
+    .input(z.object({ ders: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const attempts = await ctx.prisma.attempt.findMany({
+        where: {
+          userId: ctx.user.id,
+          dogruMu: false,
+        },
+        include: { question: { include: { topic: true } } },
+        orderBy: { tarih: "desc" },
+        take: 500,
+      });
+
+      // Her sorudan yalnızca en son yanlış attempt'i tut
+      const gorulen = new Set<string>();
+      let tekil = attempts.filter((a) => {
+        if (gorulen.has(a.questionId)) return false;
+        gorulen.add(a.questionId);
+        return true;
+      });
+
+      // Ders filtresi
+      if (input?.ders) {
+        tekil = tekil.filter((a) => a.question.topic.ders === input.ders);
+      }
+
+      return tekil.map((a) => ({
+        attemptId: a.id,
+        tarih: a.tarih,
+        secilenSik: a.secilenSik,
+        sureMs: a.sureMs,
+        question: {
+          id: a.question.id,
+          soruMetni: a.question.soruMetni,
+          siklar: a.question.siklar,
+          dogruSik: a.question.dogruSik,
+          aciklama: a.question.aciklama,
+          zorluk: a.question.zorluk,
+          ders: a.question.topic.ders,
+          konuIsim: a.question.topic.isim,
+        },
+      }));
+    }),
+
   // Bugunun oturumu
   getTodaySession: protectedProcedure.query(async ({ ctx }) => {
     const plan = await ctx.prisma.studyPlan.findFirst({

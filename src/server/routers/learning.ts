@@ -1148,4 +1148,118 @@ export const learningRouter = router({
       const topic = rawTopic as typeof rawTopic & { aiAnlatim?: string | null; pdfUrl?: string | null };
       return { topic, mastery };
     }),
+
+  // ─── VELİ PANELİ ──────────────────────────────────────────────────────────
+
+  // Veli, öğrenci e-postasıyla çocuğunu hesabına bağlar
+  veliBagla: protectedProcedure
+    .input(z.object({ cocukEmail: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      const cocuk = await ctx.prisma.user.findUnique({
+        where: { email: input.cocukEmail },
+      });
+      if (!cocuk) {
+        throw new Error("Bu e-posta ile kayıtlı öğrenci bulunamadı.");
+      }
+      if (cocuk.id === ctx.user.id) {
+        throw new Error("Kendi hesabınızı bağlayamazsınız.");
+      }
+      await ctx.prisma.user.update({
+        where: { id: cocuk.id },
+        data: { parentId: ctx.user.id },
+      });
+      return { basarili: true, cocukIsim: cocuk.isim };
+    }),
+
+  // Veli paneli verisi — tüm bağlı çocukların istatistikleri
+  getVeliDashboard: protectedProcedure.query(async ({ ctx }) => {
+    const cocuklar = await ctx.prisma.user.findMany({
+      where: { parentId: ctx.user.id },
+      include: {
+        masteries: { include: { topic: { select: { ders: true, isim: true } } } },
+        attempts: {
+          orderBy: { tarih: "desc" },
+          take: 30,
+          select: { dogruMu: true, tarih: true, sureMs: true },
+        },
+      },
+    });
+
+    return cocuklar.map((c) => {
+      const toplamAttempt = c.attempts.length;
+      const dogruSayisi = c.attempts.filter((a) => a.dogruMu).length;
+      const basariYuzdesi = toplamAttempt > 0 ? Math.round((dogruSayisi / toplamAttempt) * 100) : 0;
+
+      const dersMastery: Record<string, number> = {};
+      for (const m of c.masteries) {
+        const ders = m.topic.ders;
+        if (!dersMastery[ders]) dersMastery[ders] = 0;
+        dersMastery[ders] = Math.max(dersMastery[ders], m.skor);
+      }
+
+      return {
+        id: c.id,
+        isim: c.isim,
+        email: c.email,
+        currentStreak: c.currentStreak,
+        longestStreak: c.longestStreak,
+        lastStudyDate: c.lastStudyDate,
+        basariYuzdesi,
+        toplamAttempt,
+        dersMastery,
+      };
+    });
+  }),
+
+  // ─── LGS PUAN TAHMİNİ ─────────────────────────────────────────────────────
+
+  getLgsPuanTahmini: protectedProcedure.query(async ({ ctx }) => {
+    const masteries = await ctx.prisma.mastery.findMany({
+      where: { userId: ctx.user.id },
+      include: { topic: { select: { ders: true } } },
+    });
+
+    const LGS_SORU_SAYISI: Record<string, number> = {
+      TURKCE: 20, MATEMATIK: 20, FEN: 20, SOSYAL: 10, DIN: 10, INGILIZCE: 10,
+    };
+
+    // Her ders için ortalama mastery
+    const dersSkorlar: Record<string, number[]> = {};
+    for (const m of masteries) {
+      const ders = m.topic.ders;
+      if (!dersSkorlar[ders]) dersSkorlar[ders] = [];
+      dersSkorlar[ders].push(m.skor);
+    }
+
+    let toplamTahminiDogru = 0;
+    const dersDetay: Record<string, { mastery: number; tahminiDogru: number; soruSayisi: number }> = {};
+
+    for (const [ders, soruSayisi] of Object.entries(LGS_SORU_SAYISI)) {
+      const skorlar = dersSkorlar[ders] ?? [];
+      const ort = skorlar.length ? skorlar.reduce((a, b) => a + b, 0) / skorlar.length : 0;
+      const tahminiDogru = Math.round((ort / 100) * soruSayisi);
+      toplamTahminiDogru += tahminiDogru;
+      dersDetay[ders] = { mastery: Math.round(ort), tahminiDogru, soruSayisi };
+    }
+
+    // YEP puanı tahmini: minimum 100, maksimum 500
+    const yepPuan = Math.min(500, Math.round(100 + (toplamTahminiDogru / 90) * 400));
+
+    // Eşleşen okullar
+    let eslesenOkullar: Array<{ id: string; isim: string; sehir: string; minPuan: number; tur: string }> = [];
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const schoolPrisma = ctx.prisma as any;
+      eslesenOkullar = await schoolPrisma.school.findMany({
+        where: { minPuan: { lte: yepPuan } },
+        orderBy: { minPuan: "desc" },
+        take: 5,
+        select: { id: true, isim: true, sehir: true, minPuan: true, tur: true },
+      });
+    } catch {
+      // Schools tablosu boşsa devam et
+    }
+
+    return { toplamTahminiDogru, toplamSoru: 90, yepPuan, dersDetay, eslesenOkullar };
+  }),
 });

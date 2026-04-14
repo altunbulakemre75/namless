@@ -24,8 +24,12 @@ export interface GeminiCallConfig {
   temperature?: number;
 }
 
+type GeminiPart =
+  | { text: string }
+  | { inline_data: { mime_type: string; data: string } };
+
 interface GeminiContent {
-  parts: Array<{ text: string }>;
+  parts: GeminiPart[];
   role: "user" | "model";
 }
 
@@ -98,7 +102,8 @@ export async function callGemini(
 export async function* callGeminiStream(
   prompt: string,
   config: GeminiCallConfig,
-  systemPrompt?: string
+  systemPrompt?: string,
+  imageBase64?: string // base64 encoded image (vision desteği)
 ): AsyncGenerator<string> {
   if (!isGeminiAvailable()) {
     yield "[AI yanıtı için GEMINI_API_KEY gerekli]";
@@ -108,8 +113,14 @@ export async function* callGeminiStream(
   const apiKey = process.env.GEMINI_API_KEY!;
   const url = `${GEMINI_BASE_URL}/models/${config.model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
+  const userParts: GeminiPart[] = [];
+  if (imageBase64) {
+    userParts.push({ inline_data: { mime_type: "image/jpeg", data: imageBase64 } });
+  }
+  userParts.push({ text: prompt });
+
   const body: GeminiRequest = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ role: "user", parts: userParts }],
     generationConfig: {
       maxOutputTokens: config.maxTokens,
       temperature: config.temperature ?? 0.7,

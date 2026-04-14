@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, BookOpen, PenTool, LayoutDashboard, Settings, Award, LogOut } from "lucide-react";
+import { Home, BookOpen, PenTool, Target, BookX, Users, Settings, Award, LogOut } from "lucide-react";
+import KocBaloncugu from "./KocBaloncugu";
 
 interface NavItem {
   href: string | null;
@@ -13,12 +14,14 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", icon: Home, label: "Ana Sayfa" },
-  { href: "/konular",   icon: BookOpen, label: "Konular"   },
-  { href: "/deneme",    icon: PenTool, label: "Deneme"    },
-  { href: null, icon: LayoutDashboard, label: "İstatistikler", badge: "Yakında" },
-  { href: null, icon: Award, label: "Rozetler",      badge: "Yakında" },
-  { href: null, icon: Settings, label: "Ayarlar",       badge: "Yakında" },
+  { href: "/dashboard",   icon: Home,     label: "Ana Sayfa"       },
+  { href: "/konular",     icon: BookOpen, label: "Konular"         },
+  { href: "/deneme",      icon: PenTool,  label: "Deneme"          },
+  { href: "/hata-defteri",icon: BookX,    label: "Hata Defteri"    },
+  { href: "/lgs-tahmin",  icon: Target,   label: "Puan Tahmini"    },
+  { href: "/veli",        icon: Users,    label: "Veli Paneli"     },
+  { href: null, icon: Award,    label: "Rozetler", badge: "Yakında" },
+  { href: null, icon: Settings, label: "Ayarlar",  badge: "Yakında" },
 ];
 
 interface Props {
@@ -92,6 +95,8 @@ export default function SidebarLayout({ children, userName, onLogout }: Props) {
           })}
         </nav>
 
+        <KocBaloncugu />
+
         {/* User panel */}
         <div className="p-4 border-t border-foreground/10 bg-background/50">
           <div className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-foreground/5 cursor-pointer transition-all border border-transparent hover:border-foreground/10">
@@ -148,6 +153,10 @@ export default function SidebarLayout({ children, userName, onLogout }: Props) {
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.015] pointer-events-none mix-blend-overlay" />
         {children}
       </main>
+
+      <div className="md:hidden">
+        <KocBaloncugu variant="floating" />
+      </div>
     </div>
   );
 }
