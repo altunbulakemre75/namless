@@ -10,12 +10,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createSSEStream, SSE_HEADERS, formatSSE } from "@/infrastructure/ai/streaming";
+import { SSE_HEADERS } from "@/infrastructure/ai/streaming";
 import { getModelForTask, type TaskType } from "@/infrastructure/ai/model-router";
 import { callGeminiStream } from "@/infrastructure/ai/providers/gemini-provider";
 import { sanitizeInput } from "@/infrastructure/security/prompt-guard";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const encoder = new TextEncoder();
 
 /** Supabase auth token ile userId doğrula */
 async function getUserId(request: NextRequest): Promise<string | null> {
@@ -60,52 +61,42 @@ export async function POST(request: NextRequest) {
 
   const sanitized = sanitizeInput(prompt.trim(), taskType);
 
-  const stream = createSSEStream(async (controller) => {
-    const send = (data: string) => {
-      (controller as unknown as { send: (d: unknown) => void }).send(
-        JSON.parse(data.replace(/^data: /, ""))
-      );
-    };
+  // ReadableStream doğrudan oluştur — createSSEStream wrapper kullanma
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enqueue = (event: unknown) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
 
-    // Doğrudan encoder kullanacağız
-    const encoder = new TextEncoder();
-    const enqueue = (event: unknown) => {
-      (controller as ReadableStreamDefaultController).enqueue(
-        encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
-      );
-    };
+      enqueue({ type: "start", mode: taskType });
 
-    enqueue({ type: "start", mode: taskType });
-
-    try {
-      if (config.provider === "gemini") {
-        // Gemini stream — hata durumunda Claude Haiku'ya düş
-        let geminiSuccess = false;
-        const gen = callGeminiStream(sanitized, config);
-        for await (const chunk of gen) {
-          if (chunk === "[GEMINI_ERROR]") {
-            // Gemini başarısız → fallback tetiklenir, döngüden çık
-            break;
+      try {
+        if (config.provider === "gemini") {
+          // Gemini stream — hata durumunda Claude Haiku'ya düş
+          let geminiSuccess = false;
+          const gen = callGeminiStream(sanitized, config);
+          for await (const chunk of gen) {
+            if (chunk === "[GEMINI_ERROR]") break; // fallback'e geç
+            geminiSuccess = true;
+            enqueue({ type: "chunk", text: chunk });
           }
-          geminiSuccess = true;
-          enqueue({ type: "chunk", text: chunk });
+          if (geminiSuccess) {
+            enqueue({ type: "done" });
+            controller.close();
+            return;
+          }
+          // Gemini başarısız → Claude Haiku fallback
         }
-        if (geminiSuccess) {
-          enqueue({ type: "done" });
-          return;
-        }
-        // Gemini başarısız oldu → Claude Haiku ile devam et (aşağı düş)
-      }
 
-      {
-        // Claude stream (Gemini fallback veya doğrudan Claude görevi)
+        // Claude stream (doğrudan veya Gemini fallback)
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey || apiKey.startsWith("buraya")) {
           enqueue({ type: "error", message: "ANTHROPIC_API_KEY eksik" });
+          controller.close();
           return;
         }
 
-        // Gemini fallback durumunda Claude Haiku kullan
+        // Gemini fallback durumunda model'i Claude Haiku olarak zorla
         const claudeModel = config.provider === "gemini"
           ? "claude-haiku-4-5-20251001"
           : config.model;
@@ -127,6 +118,7 @@ export async function POST(request: NextRequest) {
 
         if (!response.ok || !response.body) {
           enqueue({ type: "error", message: "Claude stream başlatılamadı" });
+          controller.close();
           return;
         }
 
@@ -153,16 +145,18 @@ export async function POST(request: NextRequest) {
                 const text = parsed.delta?.text ?? "";
                 if (text) enqueue({ type: "chunk", text });
               }
-            } catch { /* atla */ }
+            } catch { /* geçersiz JSON — atla */ }
           }
         }
-      }
 
-      enqueue({ type: "done" });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
-      enqueue({ type: "error", message: msg });
-    }
+        enqueue({ type: "done" });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+        enqueue({ type: "error", message: msg });
+      } finally {
+        controller.close();
+      }
+    },
   });
 
   return new Response(stream, { headers: SSE_HEADERS });
