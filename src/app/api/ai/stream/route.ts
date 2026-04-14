@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         // Claude stream (doğrudan veya Gemini fallback)
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey || apiKey.startsWith("buraya")) {
-          enqueue({ type: "error", message: "ANTHROPIC_API_KEY eksik" });
+          enqueue({ type: "error", message: "AI şu an yanıt veremiyor, lütfen biraz sonra tekrar dene." });
           controller.close();
           return;
         }

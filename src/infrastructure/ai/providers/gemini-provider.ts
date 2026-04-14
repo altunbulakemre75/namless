@@ -12,8 +12,8 @@
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 export const GEMINI_MODELS = {
-  flash: "gemini-2.0-flash",
-  pro:   "gemini-1.5-pro",
+  flash: "gemini-2.5-flash",
+  pro:   "gemini-2.5-pro",
 } as const;
 
 export type GeminiModel = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS];
@@ -159,8 +159,13 @@ export async function* callGeminiStream(
 
       try {
         const chunk = JSON.parse(jsonStr);
-        const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (text) yield text;
+        const parts: Array<{ text?: string; thought?: boolean }> =
+          chunk.candidates?.[0]?.content?.parts ?? [];
+        for (const part of parts) {
+          // Gemini 2.5 düşünce (thinking) parçalarını atla
+          if (part.thought) continue;
+          if (part.text) yield part.text;
+        }
       } catch {
         // Geçersiz JSON satırı — atla
       }
