@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, BookOpen, PenTool, Target, BookX, Users, Settings, Award, LogOut } from "lucide-react";
+import { Home, BookOpen, PenTool, Target, BookX, Users, Play, School, Award, LogOut } from "lucide-react";
 import KocBaloncugu from "./KocBaloncugu";
 
 interface NavItem {
@@ -14,14 +14,15 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/dashboard",   icon: Home,     label: "Ana Sayfa"       },
-  { href: "/konular",     icon: BookOpen, label: "Konular"         },
-  { href: "/deneme",      icon: PenTool,  label: "Deneme"          },
-  { href: "/hata-defteri",icon: BookX,    label: "Hata Defteri"    },
-  { href: "/lgs-tahmin",  icon: Target,   label: "Puan Tahmini"    },
-  { href: "/veli",        icon: Users,    label: "Veli Paneli"     },
-  { href: null, icon: Award,    label: "Rozetler", badge: "Yakında" },
-  { href: null, icon: Settings, label: "Ayarlar",  badge: "Yakında" },
+  { href: "/dashboard",    icon: Home,     label: "Ana Sayfa"    },
+  { href: "/konular",      icon: BookOpen, label: "Konular"      },
+  { href: "/calis",        icon: Play,     label: "Çalış"        },
+  { href: "/deneme",       icon: PenTool,  label: "Deneme"       },
+  { href: "/hata-defteri", icon: BookX,    label: "Hata Defteri" },
+  { href: "/lgs-tahmin",   icon: Target,   label: "Puan Tahmini" },
+  { href: "/hedef-okul",   icon: School,   label: "Hedef Okul"   },
+  { href: "/veli",         icon: Users,    label: "Veli Paneli"  },
+  { href: null, icon: Award, label: "Rozetler", badge: "Yakında" },
 ];
 
 interface Props {

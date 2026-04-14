@@ -59,7 +59,8 @@ function calculateWeightedAverage(dersMastery: Record<string, number>): number |
     }
   }
   if (kapsanmisAgirlik === 0) return null;
-  return Math.round(agirlikliToplam / toplamAgirlik);
+  // kapsanmisAgirlik ile böl — tüm dersler yoksa haksız düşürme olmasın
+  return Math.round(agirlikliToplam / kapsanmisAgirlik);
 }
 
 // ─── SVG Halka İlerleme ─────────────────────────────────────────────────────
