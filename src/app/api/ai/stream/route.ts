@@ -79,18 +79,36 @@ export async function POST(request: NextRequest) {
 
     try {
       if (config.provider === "gemini") {
-        // Gemini stream
+        // Gemini stream — hata durumunda Claude Haiku'ya düş
+        let geminiSuccess = false;
         const gen = callGeminiStream(sanitized, config);
         for await (const chunk of gen) {
+          if (chunk === "[GEMINI_ERROR]") {
+            // Gemini başarısız → fallback tetiklenir, döngüden çık
+            break;
+          }
+          geminiSuccess = true;
           enqueue({ type: "chunk", text: chunk });
         }
-      } else {
-        // Claude stream
+        if (geminiSuccess) {
+          enqueue({ type: "done" });
+          return;
+        }
+        // Gemini başarısız oldu → Claude Haiku ile devam et (aşağı düş)
+      }
+
+      {
+        // Claude stream (Gemini fallback veya doğrudan Claude görevi)
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey || apiKey.startsWith("buraya")) {
           enqueue({ type: "error", message: "ANTHROPIC_API_KEY eksik" });
           return;
         }
+
+        // Gemini fallback durumunda Claude Haiku kullan
+        const claudeModel = config.provider === "gemini"
+          ? "claude-haiku-4-5-20251001"
+          : config.model;
 
         const response = await fetch(ANTHROPIC_API_URL, {
           method: "POST",
@@ -100,7 +118,7 @@ export async function POST(request: NextRequest) {
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: config.model,
+            model: claudeModel,
             max_tokens: config.maxTokens,
             stream: true,
             messages: [{ role: "user", content: sanitized }],

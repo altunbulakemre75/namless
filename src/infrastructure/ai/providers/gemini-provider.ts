@@ -12,8 +12,8 @@
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 export const GEMINI_MODELS = {
-  flash: "gemini-2.5-flash",
-  pro:   "gemini-2.5-pro",
+  flash: "gemini-2.0-flash",
+  pro:   "gemini-1.5-pro",
 } as const;
 
 export type GeminiModel = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS];
@@ -82,7 +82,7 @@ export async function callGemini(
   if (!response.ok) {
     const errText = await response.text();
     console.error(`Gemini API hatası (${response.status}):`, errText);
-    return "[Gemini yanıtı üretilemedi]";
+    return "[GEMINI_ERROR]";
   }
 
   const data = await response.json();
@@ -129,14 +129,14 @@ export async function* callGeminiStream(
     });
   } catch (err) {
     console.error("Gemini stream bağlantı hatası:", err);
-    yield "[Gemini bağlantı hatası]";
+    yield "[GEMINI_ERROR]";
     return;
   }
 
   if (!response.ok || !response.body) {
     const errText = await response.text();
     console.error(`Gemini stream hatası (${response.status}):`, errText);
-    yield "[Gemini stream hatası]";
+    yield "[GEMINI_ERROR]";
     return;
   }
 
